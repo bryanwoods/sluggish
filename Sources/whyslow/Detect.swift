@@ -298,7 +298,8 @@ private func cpuHogs(_ s: Snapshot) -> [Finding] {
     let safariRuns = s.procs.values.contains { $0.app == "Safari" }
     let serviceNames = services.reduce(Set<String>()) { $0.union($1.names) }
     var groups: [String: (cpu: Double, n: Int, root: Proc, app: String?)] = [:]
-    for p in s.procs.values where p.cpu > 0.01 && p.pid != getpid() && browserOf(p, safariRuns: safariRuns) == nil && !serviceNames.contains(p.name) {
+    let vm = dockerVM(s)?.pid
+    for p in s.procs.values where p.cpu > 0.01 && p.pid != getpid() && p.pid != vm && browserOf(p, safariRuns: safariRuns) == nil && !serviceNames.contains(p.name) {
         let app = p.app
         let root = app == nil ? starter(p, s).root : p
         let key = app ?? "pid:\(root.pid)"
@@ -385,13 +386,17 @@ func appName(_ path: String) -> String? {
     return nil
 }
 
+// Docker's Linux VM. The Docker card owns its memory and its CPU, so the CPU card skips it.
+// ponytail: largest Virtualization.framework VM is assumed to be Docker's; UTM/Tart users need the responsible-pid lookup
+private func dockerVM(_ s: Snapshot) -> Proc? {
+    guard s.procs.values.contains(where: { $0.path.contains("/Docker.app/") }) else { return nil }
+    return s.procs.values.filter { $0.path.hasSuffix("/com.apple.Virtualization.VirtualMachine") }.max { $0.footprint < $1.footprint }
+}
+
 private func docker(_ s: Snapshot) -> [Finding] {
-    // ponytail: largest Virtualization.framework VM is assumed to be Docker's; UTM/Tart users need the responsible-pid lookup
-    guard s.procs.values.contains(where: { $0.path.contains("/Docker.app/") }),
-          let vm = s.procs.values.filter({ $0.path.hasSuffix("/com.apple.Virtualization.VirtualMachine") }).max(by: { $0.footprint < $1.footprint }),
-          vm.footprint > 1 << 30
-    else { return [] }
+    guard let vm = dockerVM(s), vm.footprint > 1 << 30 || vm.cpu >= 1 else { return [] }
     let used = s.containers.reduce(0) { $0 + $1.mem }
+    let busy = vm.cpu >= 0.5 ? " Docker also uses \(pct(vm.cpu, s)) right now, for containers that are working." : ""
     let squeezed = vm.resident * 2 < vm.footprint ? " Most of that memory is now compressed or moved to disk, and that makes the Mac slower." : ""
     let stops = s.containers.sorted { $0.mem > $1.mem }.prefix(3).map {
         Action(label: "Stop \($0.name) (\(dbKind($0.image)), \(size($0.mem)), \(onFor($0.status)))", fix: .dockerStop($0.id))
@@ -400,12 +405,14 @@ private func docker(_ s: Snapshot) -> [Finding] {
         id: "docker", bucket: .always,
         title: "Docker uses \(size(vm.footprint)) of memory",
         detail: (s.containers.isEmpty ? "Docker keeps this memory for its Linux system, even when your containers need less."
-            : "Your \(plural(s.containers.count, "container")) need only \(size(used)). Docker keeps the rest for itself.") + "\(squeezed) Quit Docker to free all of it.",
+            : "Your \(plural(s.containers.count, "container")) need only \(size(used)). Docker keeps the rest for itself.") + "\(squeezed)\(busy) Quit Docker to free all of it.",
         bytes: vm.footprint,
         actions: [Action(label: "Quit Docker", fix: .quitApp("com.docker.docker"))] + stops)
-        .card("Docker", s.containers.isEmpty ? "Docker keeps this memory for its Linux system." : "Your containers need only \(size(used)). Docker keeps the rest.",
+        .card("Docker", (s.containers.isEmpty ? "Docker keeps this memory for its Linux system." : "Your containers need only \(size(used)). Docker keeps the rest.")
+                + (vm.cpu >= 0.5 ? " It also uses \(pct(vm.cpu, s)) now." : ""),
               metric: "\(Int(ofRam(vm.footprint, s) * 100))% of memory",
-              icon: s.apps.first { $0.bundleID == "com.docker.docker" }?.path ?? "shippingbox", impact: ofRam(vm.footprint, s))]
+              icon: s.apps.first { $0.bundleID == "com.docker.docker" }?.path ?? "shippingbox",
+              impact: max(ofRam(vm.footprint, s), vm.cpu / Double(max(s.cores, 1))))]
 }
 
 private func dbKind(_ image: String) -> String {
@@ -706,6 +713,8 @@ func demoSnapshot(now: Date = Date()) -> Snapshot {
         p(62, 1, ["Safari"], path: "/Applications/Safari.app/Contents/MacOS/Safari", mem: 200 << 20),
         p(63, 1, ["webcontent"], path: "/System/Library/Frameworks/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.WebContent.xpc/Contents/MacOS/com.apple.WebKit.WebContent", cpu: 1.2, mem: 300 << 20),
         p(64, 1, ["photoanalysisd"], path: "/System/Library/PrivateFrameworks/PhotoAnalysis.framework/Versions/A/Support/photoanalysisd", cpu: 1.2),
+        p(80, 1, ["com.docker.backend"], path: "/Applications/Docker.app/Contents/MacOS/com.docker.backend"),
+        p(81, 1, ["vm"], path: "/System/Library/Frameworks/Virtualization.framework/Versions/A/XPCServices/com.apple.Virtualization.VirtualMachine.xpc/Contents/MacOS/com.apple.Virtualization.VirtualMachine", cpu: 1.2, mem: 2 << 30),
         p(70, 1, ["loginwindow"], path: "/System/Library/CoreServices/loginwindow.app/Contents/MacOS/loginwindow", age: 10 * 86400),
     ]
     let atLogin = 10 * 86400.0 - 60
@@ -803,6 +812,7 @@ func selfTest() {
     precondition(sims.count == 1 && sims[0].title == "1 Xcode simulator uses 210 MB", "\(sims)")
     precondition(sims[0].actions[0].fix.command == "simctl shutdown 00000000-0000-0000-0000-000000000000")
 
+    precondition(one("docker").summary.hasSuffix("It also uses 12% CPU now.") && one("docker").detail.contains("Docker also uses 12% CPU right now"), one("docker").summary)
     let cpu = fs.filter { $0.id.hasPrefix("cpu:") }
     precondition(cpu.count == 1 && cpu[0].title == "Claude Code is running tests" && cpu[0].metric == "27% CPU", "\(cpu)")
     precondition(cpu[0].detail.hasPrefix("Claude Code started it 43 seconds ago."), cpu[0].detail)
