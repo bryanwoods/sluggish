@@ -13,7 +13,10 @@ struct Proc {
     var cpu: Double = 0
     var cwd = ""
     var ports: [UInt16] = []
-    var name: String { URL(fileURLWithPath: args.first ?? path).lastPathComponent }
+    var name: String {
+        let s = args.first ?? path
+        return s.lastIndex(of: "/").map { String(s[s.index(after: $0)...]) } ?? s
+    }
 }
 
 struct Container {
@@ -41,20 +44,45 @@ struct Snapshot {
     var now = Date()
     var thermal: ProcessInfo.ThermalState = ProcessInfo.processInfo.thermalState
     var pressure: Int32 = 1
+    var memorySaver: Int?
     var access: [String: Access] = [:]
     var tabs: [String: Tabs] = [:]
 }
 
+// `docker stats` makes the Docker daemon read every container, so the result is reused for a minute. A fix clears it.
+private var dockerCache: (at: Date, list: [Container])?
+// Reading tabs makes the browser answer an Apple Event, so the list is reused for 30 seconds.
+private var tabsCache: [String: (at: Date, tabs: Tabs?)] = [:]
+// A click on a fix, or on Refresh, means the user wants fresh data.
+func forgetCaches() { dockerCache = nil; tabsCache = [:] }
+
 let dockerBin = executable(["/usr/local/bin/docker", "/opt/homebrew/bin/docker", "/Applications/Docker.app/Contents/Resources/bin/docker"])
 
-func sample(seconds: Double = 2) -> Snapshot {
-    let dockerPS = dockerBin.flatMap { start($0, ["ps", "--format", "{{.ID}}\t{{.Names}}\t{{.Status}}\t{{.Image}}"]) }
-    let dockerStats = dockerBin.flatMap { start($0, ["stats", "--no-stream", "--format", "{{.ID}}\t{{.MemUsage}}"]) }
+// --bench sets this to collect the CPU time of each phase; nil costs nothing.
+var benchMarks: [(String, Double)]?
+func mark(_ phase: String) {
+    guard benchMarks != nil else { return }
+    var ru = rusage()
+    getrusage(RUSAGE_SELF, &ru)
+    benchMarks!.append((phase, Double(ru.ru_utime.tv_sec + ru.ru_stime.tv_sec) * 1000 + Double(ru.ru_utime.tv_usec + ru.ru_stime.tv_usec) / 1000))
+}
+
+// Each check runs on a background thread with no run loop, so autoreleased AppKit and Foundation objects
+// (Apple Event replies, NSWorkspace results, file data) pile up unless a pool drains them.
+func sample(seconds: Double = 1) -> Snapshot { autoreleasepool { scan(seconds) } }
+
+private func scan(_ seconds: Double) -> Snapshot {
+    mark("start")
+    let dockerRuns = dockerBin != nil && !NSRunningApplication.runningApplications(withBundleIdentifier: "com.docker.docker").isEmpty
+    let dockerStale = dockerRuns && dockerCache.map { Date().timeIntervalSince($0.at) > 60 } ?? true
+    let dockerPS = dockerStale ? start(dockerBin!, ["ps", "--format", "{{.ID}}\t{{.Names}}\t{{.Status}}\t{{.Image}}"]) : nil
+    let dockerStats = dockerStale ? start(dockerBin!, ["stats", "--no-stream", "--format", "{{.ID}}\t{{.MemUsage}}"]) : nil
 
     let t0 = mach_absolute_time()
     let cpu0 = cpuTicks()
     var before: [pid_t: UInt64] = [:]
     for pid in allPids() { if let u = usage(pid) { before[pid] = u.ri_user_time + u.ri_system_time } }
+    mark("first pass")
     Thread.sleep(forTimeInterval: seconds)
     let elapsed = Double(mach_absolute_time() - t0)
     let cpu1 = cpuTicks()
@@ -83,7 +111,11 @@ func sample(seconds: Double = 2) -> Snapshot {
     }
 
     var s = Snapshot(procs: procs)
-    s.containers = containers(ps: finish(dockerPS), stats: finish(dockerStats))
+    mark("process scan")
+    if dockerStale { dockerCache = (Date(), containers(ps: finish(dockerPS), stats: finish(dockerStats))) }
+    if !dockerRuns { dockerCache = nil }
+    s.containers = dockerCache?.list ?? []
+    mark("docker")
     s.ram = ProcessInfo.processInfo.physicalMemory
     s.cores = ProcessInfo.processInfo.activeProcessorCount
     var boot = timeval()
@@ -92,17 +124,34 @@ func sample(seconds: Double = 2) -> Snapshot {
     s.uptime = s.now.timeIntervalSince1970 - Double(boot.tv_sec)
 
     s.cpuBusy = Double(cpu1.busy - cpu0.busy) / Double(max(cpu1.total - cpu0.total, 1))
-    let disk = try? URL(fileURLWithPath: "/").resourceValues(forKeys: [.volumeAvailableCapacityForImportantUsageKey, .volumeTotalCapacityKey])
-    s.diskFree = disk?.volumeAvailableCapacityForImportantUsage ?? 0
-    s.diskTotal = Int64(disk?.volumeTotalCapacity ?? 0)
+    // statfs is cheap but does not count purgeable space; the accurate value costs ~10 ms, so ask for it only near the limit.
+    var fs = statfs()
+    statfs("/", &fs)
+    s.diskFree = Int64(fs.f_bavail) * Int64(fs.f_bsize)
+    s.diskTotal = Int64(fs.f_blocks) * Int64(fs.f_bsize)
+    if s.diskFree < 30 << 30 {
+        s.diskFree = (try? URL(fileURLWithPath: "/").resourceValues(forKeys: [.volumeAvailableCapacityForImportantUsageKey]))?
+            .volumeAvailableCapacityForImportantUsage ?? s.diskFree
+    }
     s.apps = NSWorkspace.shared.runningApplications.compactMap { a in
         guard let id = a.bundleIdentifier, let url = a.bundleURL else { return nil }
         return RunningApp(pid: a.processIdentifier, name: a.localizedName ?? url.deletingPathExtension().lastPathComponent,
                           bundleID: id, path: url.path, background: a.activationPolicy != .regular)
     }
+    // Chromium's MemorySaverModeState: 0 off, 2 on. Chrome writes the key only after the user changes the setting.
+    if s.apps.contains(where: { $0.bundleID == "com.google.Chrome" }),
+       let data = FileManager.default.contents(atPath: NSHomeDirectory() + "/Library/Application Support/Google/Chrome/Local State"),
+       let local = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any],
+       let tuning = local["performance_tuning"] as? [String: Any], let mode = tuning["high_efficiency_mode"] as? [String: Any] {
+        s.memorySaver = mode["state"] as? Int
+    }
+    mark("system and apps")
     for id in Set(s.apps.map(\.bundleID)).intersection(scriptableBrowsers) {
         s.access[id] = automation(id, ask: false)
-        if s.access[id] == .allowed { s.tabs[id] = readTabs(id) }
+        guard s.access[id] == .allowed else { continue }
+        if let hit = tabsCache[id], Date().timeIntervalSince(hit.at) < 30 { s.tabs[id] = hit.tabs; continue }
+        s.tabs[id] = readTabs(id)
+        tabsCache[id] = (Date(), s.tabs[id])
     }
     var sw = xsw_usage()
     var size = MemoryLayout<xsw_usage>.size
@@ -112,6 +161,7 @@ func sample(seconds: Double = 2) -> Snapshot {
     var levelSize = MemoryLayout<Int32>.size
     sysctlbyname("kern.memorystatus_vm_pressure_level", &level, &levelSize, nil, 0)
     s.pressure = level
+    mark("tabs")
     return s
 }
 
@@ -138,7 +188,7 @@ private func allPids() -> [pid_t] {
     return Array(buf.prefix(Int(max(n, 0))))
 }
 
-private func usage(_ pid: pid_t) -> rusage_info_v4? {
+func usage(_ pid: pid_t) -> rusage_info_v4? {
     var ri = rusage_info_v4()
     let rc = withUnsafeMutablePointer(to: &ri) {
         $0.withMemoryRebound(to: rusage_info_t?.self, capacity: 1) { proc_pid_rusage(pid, RUSAGE_INFO_V4, $0) }

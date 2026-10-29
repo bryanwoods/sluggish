@@ -15,7 +15,7 @@ func explain(_ evidence: String) async -> String? {
         You explain to a developer what a process on their Mac does. Use only the evidence.
         Do not mention sizes, ports, process IDs, ages, project names, or branch names.
         """)
-    guard let g = try? await session.respond(to: "Evidence:\n\(evidence.prefix(3000))", generating: Guess.self).content else { return nil }
+    guard let g = try? await session.respond(to: "Evidence:\n\(evidence.prefix(3000))", generating: Guess.self, options: GenerationOptions(sampling: .greedy)).content else { return nil }
     let does = g.does.trimmingCharacters(in: CharacterSet(charactersIn: " ."))
     return "It \(g.sure ? "" : "probably ")\(does.prefix(1).lowercased() + does.dropFirst())."
 }

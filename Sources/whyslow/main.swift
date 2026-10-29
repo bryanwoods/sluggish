@@ -10,6 +10,35 @@ if CommandLine.arguments.contains("--demo") {
     print(text(s, findings(s)), terminator: "")
     exit(0)
 }
+if CommandLine.arguments.contains("--bench") {
+    var phases: [String: [Double]] = [:]
+    var order: [String] = []
+    var childStart = rusage()
+    getrusage(RUSAGE_CHILDREN, &childStart)
+    print(String(format: "footprint before any check: %.1f MB", footprintMB()))
+    for run in 1...5 {
+        benchMarks = []
+        let s = sample(seconds: 0.5)
+        _ = findings(s)
+        if run == 1 { print(String(format: "footprint after check 1:    %.1f MB", footprintMB())) }
+        for (i, m) in benchMarks!.enumerated().dropFirst() { phases[m.0, default: []].append(m.1 - benchMarks![i - 1].1) }
+        if order.isEmpty { order = benchMarks!.dropFirst().map(\.0) }
+    }
+    var child = rusage()
+    getrusage(RUSAGE_CHILDREN, &child)
+    let childMs = Double(child.ru_utime.tv_sec + child.ru_stime.tv_sec - childStart.ru_utime.tv_sec - childStart.ru_stime.tv_sec) * 1000
+        + Double(child.ru_utime.tv_usec + child.ru_stime.tv_usec - childStart.ru_utime.tv_usec - childStart.ru_stime.tv_usec) / 1000
+    print("median CPU ms per check, by phase:")
+    var total = 0.0
+    for name in order {
+        let v = phases[name, default: [0]].sorted()[phases[name, default: [0]].count / 2]
+        total += v
+        print("  " + name.padding(toLength: 16, withPad: " ", startingAt: 0) + String(format: "%7.1f", v))
+    }
+    print(String(format: "footprint now:    %7.1f MB", footprintMB()))
+    print(String(format: "  total           %7.1f\nchild processes:  %7.1f ms per check\npeak footprint:   %7.1f MB", total, childMs / 5, Double(usage(getpid())!.ri_lifetime_max_phys_footprint) / 1048576))
+    exit(0)
+}
 if CommandLine.arguments.contains("--print") {
     let s = sample()
     let fs = findings(s)
@@ -38,6 +67,8 @@ if let i = CommandLine.arguments.firstIndex(of: "--snapshot"), i + 1 < CommandLi
 }
 WhySlow.main()
 
+func footprintMB() -> Double { Double(usage(getpid())!.ri_phys_footprint) / 1048576 }
+
 // Renders the panel to a PNG at 2x, so the design can be checked without a screenshot.
 @MainActor func snapshot(_ view: some View, to path: String, dark: Bool) {
     _ = NSApplication.shared
@@ -46,6 +77,10 @@ WhySlow.main()
     let window = NSWindow(contentRect: host.frame, styleMask: .borderless, backing: .buffered, defer: false)
     window.appearance = NSAppearance(named: dark ? .darkAqua : .aqua)
     window.contentView = host
+    host.layoutSubtreeIfNeeded()
+    RunLoop.main.run(until: Date() + 0.2)
+    host.frame.size = host.fittingSize
+    window.setContentSize(host.frame.size)
     host.layoutSubtreeIfNeeded()
     let rep = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: Int(host.bounds.width * 2), pixelsHigh: Int(host.bounds.height * 2),
                                bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true, isPlanar: false, colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0)!
@@ -85,12 +120,14 @@ final class Model: ObservableObject {
     @Published var busy = false
     @Published var note: Note?
     @Published var guesses: [String: String] = [:]
+    @Published var openCard: String?
     private var asked: Set<String> = []
     private var termed: Set<pid_t> = []
 
-    func refresh() {
+    func refresh(fresh: Bool = false) {
         guard !busy else { return }
         busy = true
+        if fresh { forgetCaches() }
         let termed = termed
         Task.detached {
             let s = sample()
@@ -104,6 +141,7 @@ final class Model: ObservableObject {
         switch a.fix {
         case .openSettings, .openTab:
             note = .result(a.fix.apply(), ok: a.fix.done!)
+            forgetCaches()
             return
         default:
             break
@@ -115,6 +153,7 @@ final class Model: ObservableObject {
         let termed = termed
         Task.detached {
             let err = a.fix.apply()
+            forgetCaches()
             let s = sample()
             let fs = findings(s, termed: termed)
             let after = fs.first { $0.id == f.id }
@@ -133,16 +172,20 @@ final class Model: ObservableObject {
         note = Note(text: "Copied the report. Paste it into a message to share it.")
     }
 
+    // The on-device model runs only when someone opens a card's details, because that is the only place its line shows.
+    func guess(for f: Finding) {
+        guard let e = f.evidence, !asked.contains(e) else { return }
+        asked.insert(e)
+        Task { guesses[e] = await explain(e) }
+    }
+
     private func show(_ s: Snapshot, _ fs: [Finding], note: Note?) {
+        var s = s
+        s.procs = [:]
         snap = s
         found = fs
         self.note = note
         busy = false
-        let todo = fs.compactMap(\.evidence).filter { !asked.contains($0) }
-        asked.formUnion(todo)
-        Task {
-            for e in todo { guesses[e] = await explain(e) }
-        }
     }
 }
 
@@ -152,11 +195,12 @@ struct ReportView: View {
     @AppStorage("prTitles") private var prTitles = false
     @State private var showLeftovers = false
     @State private var showMore = false
+    @State private var listHeight: CGFloat = 0
+    @State private var openedAt = Date()
 
     var body: some View {
         let main = model.found.filter { $0.bucket != .leftovers }
         let left = model.found.filter { $0.bucket == .leftovers }
-        // ponytail: no ScrollView; compact cards keep the panel short. Add one if panels grow past the screen.
         VStack(alignment: .leading, spacing: 12) {
             if let s = model.snap {
                 let v = verdict(s, model.found)
@@ -181,28 +225,34 @@ struct ReportView: View {
                     .font(.callout).padding(8).frame(maxWidth: .infinity, alignment: .leading)
                     .background(n.color.opacity(0.12), in: RoundedRectangle(cornerRadius: 8))
             }
-            ForEach(main.prefix(3)) { CardView(f: $0, model: model, open: openCards) }
-            if main.count > 3 {
-                Fold(title: "More causes", info: "\(main.count - 3)", open: $showMore)
-                if showMore || openCards { ForEach(main.dropFirst(3)) { CardView(f: $0, model: model, open: openCards) } }
+            // The header and footer stay put; the cards scroll, capped to the screen height.
+            ScrollView {
+                VStack(alignment: .leading, spacing: 12) {
+                    ForEach(main.prefix(3)) { CardView(f: $0, model: model, forceOpen: openCards) }
+                    if main.count > 3 {
+                        Fold(title: "More causes", info: "\(main.count - 3)", open: $showMore)
+                        if showMore || openCards { ForEach(main.dropFirst(3)) { CardView(f: $0, model: model, forceOpen: openCards) } }
+                    }
+                    if !left.isEmpty {
+                        Fold(title: "Left running", info: "\(left.count) · \(size(left.reduce(0) { $0 + $1.bytes }))", open: $showLeftovers)
+                        if showLeftovers || openCards { ForEach(left) { CardView(f: $0, model: model, forceOpen: openCards) } }
+                    }
+                }
+                .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { listHeight = $0 }
             }
-            if !left.isEmpty {
-                Fold(title: "Left running", info: "\(left.count) · \(size(left.reduce(0) { $0 + $1.bytes }))", open: $showLeftovers)
-                if showLeftovers || openCards { ForEach(left) { CardView(f: $0, model: model, open: openCards) } }
-            }
+            .frame(height: min(listHeight, (NSScreen.main?.visibleFrame.height ?? 800) - 260))
             Divider()
             HStack(spacing: 10) {
                 if model.busy {
                     ProgressView().controlSize(.mini)
                     Text("Checking…").font(.caption).foregroundStyle(.secondary)
                 } else if let s = model.snap {
-                    TimelineView(.periodic(from: .now, by: 10)) { t in
-                        let age = t.date.timeIntervalSince(s.now)
-                        Text(age < 10 ? "Updated just now" : "Updated \(ago(age)) ago").font(.caption).foregroundStyle(.secondary)
-                    }
+                    // Worked out when the panel opens, not on a timer: a timer would wake the Mac while the panel is closed.
+                    let age = openedAt.timeIntervalSince(s.now)
+                    Text(age < 10 ? "Updated just now" : "Updated \(ago(age)) ago").font(.caption).foregroundStyle(.secondary)
                 }
                 Spacer()
-                Button { model.refresh() } label: { Image(systemName: "arrow.clockwise") }
+                Button { model.refresh(fresh: true) } label: { Image(systemName: "arrow.clockwise") }
                     .buttonStyle(.borderless).disabled(model.busy).help("Check again")
                 Menu {
                     Button("Copy report") { model.copyReport() }
@@ -219,7 +269,10 @@ struct ReportView: View {
         .padding(14)
         .frame(width: 400)
         .onChange(of: prTitles) { model.refresh() }
-        .onAppear { if model.snap.map({ Date().timeIntervalSince($0.now) > 10 }) ?? true { model.refresh() } }
+        .onAppear {
+            openedAt = Date()
+            if model.snap.map({ openedAt.timeIntervalSince($0.now) > 10 }) ?? true { model.refresh() }
+        }
     }
 }
 
@@ -258,7 +311,8 @@ struct Chip: View {
 struct CardView: View {
     var f: Finding
     @ObservedObject var model: Model
-    @State var open: Bool
+    var forceOpen = false
+    var open: Bool { forceOpen || model.openCard == f.id }
 
     var body: some View {
         let primary = f.steps.compactMap(\.action).first ?? f.actions.first
@@ -283,7 +337,10 @@ struct CardView: View {
                         Button(a.label) { model.run(a, on: f) }
                             .buttonStyle(.borderedProminent).controlSize(.small).disabled(model.busy).help(a.fix.command)
                     }
-                    Button(open ? "Less" : "Details") { withAnimation(.snappy) { open.toggle() } }
+                    Button(open ? "Less" : "Details") {
+                        if !open { model.guess(for: f) }
+                        withAnimation(.snappy) { model.openCard = open ? nil : f.id }
+                    }
                         .buttonStyle(.link).controlSize(.small)
                 }
                 .padding(.top, 3)
@@ -304,10 +361,11 @@ struct CardView: View {
             ForEach(Array(f.steps.enumerated()), id: \.offset) { i, step in
                 HStack(alignment: .firstTextBaseline, spacing: 6) {
                     Text("\(i + 1).").font(.callout).monospacedDigit().foregroundStyle(.secondary)
-                    Text(step.text).font(.callout).fixedSize(horizontal: false, vertical: true)
-                    Spacer(minLength: 6)
-                    if let a = step.action, a.id != primary?.id {
-                        Button(a.label) { model.run(a, on: f) }.controlSize(.small).disabled(model.busy).help(a.fix.command)
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(step.text).font(.callout).fixedSize(horizontal: false, vertical: true)
+                        if let a = step.action, a.id != primary?.id {
+                            Button(a.label) { model.run(a, on: f) }.controlSize(.small).disabled(model.busy).help(a.fix.command)
+                        }
                     }
                 }
             }

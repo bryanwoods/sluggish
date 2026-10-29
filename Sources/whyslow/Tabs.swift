@@ -21,23 +21,21 @@ func automation(_ bundleID: String, ask: Bool) -> Access {
     }
 }
 
-// NSAppleScript is main-thread only.
-private func appleScript(_ source: String) -> NSAppleEventDescriptor? {
-    let run = { () -> NSAppleEventDescriptor? in
-        var err: NSDictionary?
-        let result = NSAppleScript(source: source)?.executeAndReturnError(&err)
-        return err == nil ? result : nil
-    }
-    return Thread.isMainThread ? run() : DispatchQueue.main.sync(execute: run)
+// Runs in /usr/bin/osascript, not NSAppleScript: loading the AppleScript engine into whyslow costs about 15 MB
+// for the life of the app. macOS still applies whyslow's Automation permission, because whyslow starts the child.
+private func appleScript(_ source: String) -> String? {
+    guard let h = start("/usr/bin/osascript", ["-e", source]) else { return nil }
+    let out = finish(h)
+    return h.0.terminationStatus == 0 ? out : nil
 }
 
 func readTabs(_ bundleID: String) -> Tabs? {
-    guard let windows = appleScript("tell application id \"\(bundleID)\" to get URL of every tab of every window"), windows.numberOfItems > 0 else { return nil }
-    var urls: [String] = []
-    for w in 1...windows.numberOfItems {
-        guard let tabs = windows.atIndex(w), tabs.numberOfItems > 0 else { continue }
-        for t in 1...tabs.numberOfItems { urls.append(tabs.atIndex(t)?.stringValue ?? "") }
-    }
+    guard let out = appleScript("""
+        set text item delimiters to linefeed
+        tell application id "\(bundleID)" to set urls to URL of every tab of every window
+        return urls as text
+        """) else { return nil }
+    let urls = out.split(separator: "\n").map(String.init)
     let hosts = urls.compactMap { URL(string: $0)?.host() }.map { $0.hasPrefix("www.") ? String($0.dropFirst(4)) : $0 }
     let piles = Dictionary(grouping: hosts, by: { $0 }).map { (host: $0.key, n: $0.value.count) }
         .filter { $0.n >= 3 }.sorted { ($0.n, $1.host) > ($1.n, $0.host) }.prefix(3)

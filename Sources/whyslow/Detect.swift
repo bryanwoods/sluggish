@@ -146,9 +146,12 @@ private let siteNames = ["calendar.google.com": "Google Calendar", "mail.google.
                          "app.slack.com": "Slack", "reddit.com": "Reddit", "x.com": "X", "amazon.com": "Amazon"]
 
 func findings(_ s: Snapshot, termed: Set<pid_t> = []) -> [Finding] {
-    let general = heat(s) + browsers(s) + busyServices(s) + lowDisk(s) + loginApps(s)
-    let developer = cpuHogs(s) + docker(s) + simulators(s) + stacks(s, termed) + testBrowsers(s, termed) + caffeinates(s, termed)
-    return (general + developer).sorted { ($0.impact, $1.id) > ($1.impact, $0.id) }
+    let detectors: [(String, () -> [Finding])] = [
+        ("heat", { heat(s) }), ("browsers", { browsers(s) }), ("services", { busyServices(s) }), ("disk", { lowDisk(s) }),
+        ("login items", { loginApps(s) }), ("cpu", { cpuHogs(s) }), ("docker card", { docker(s) }), ("simulators", { simulators(s) }),
+        ("stacks", { stacks(s, termed) }), ("test browsers", { testBrowsers(s, termed) }), ("caffeinate", { caffeinates(s, termed) }),
+    ]
+    return autoreleasepool { detectors.flatMap { name, detect in defer { mark(name) }; return detect() } }.sorted { ($0.impact, $1.id) > ($1.impact, $0.id) }
 }
 
 private let browserNames = ["Safari": "Safari", "Google Chrome": "Chrome", "Arc": "Arc", "Firefox": "Firefox", "Microsoft Edge": "Edge",
@@ -196,8 +199,8 @@ private func browsers(_ s: Snapshot) -> [Finding] {
         }
         if steps.isEmpty { steps.append(Step(text: "Close the tabs that you do not need.")) }
         // ponytail: Memory Saver only for Chrome; Edge and Brave have the same feature at their own settings URLs
-        if bundleID == "com.google.Chrome", s.access["com.google.Chrome"] == .allowed {
-            steps.append(Step(text: "Turn on Memory Saver, if it is off. Chrome then puts tabs that you have not used for a while to sleep.",
+        if bundleID == "com.google.Chrome", s.access["com.google.Chrome"] == .allowed, (s.memorySaver ?? 0) == 0 {
+            steps.append(Step(text: "Turn on Memory Saver\(s.memorySaver == nil ? ", if it is off" : ""). Chrome then puts tabs that you have not used for a while to sleep.",
                               action: Action(label: "Open Chrome settings", fix: .openTab("com.google.Chrome", "chrome://settings/performance"))))
         }
         steps.append(Step(text: "Quit and open \(name) again. This frees memory that \(name) holds on to over time.",
@@ -479,7 +482,7 @@ private func simulators(_ s: Snapshot) -> [Finding] {
 // Servers that listen on a TCP port, grouped by git root, with the Docker containers whose name contains that root's name.
 private func stacks(_ s: Snapshot, _ termed: Set<pid_t>) -> [Finding] {
     let servers = s.procs.values.filter { p in
-        !p.ports.isEmpty && appName(p.path) == nil && p.cwd.hasPrefix(NSHomeDirectory() + "/")
+        !p.ports.isEmpty && appName(p.path) == nil && p.cwd.hasPrefix(NSHomeDirectory() + "/") && !isLibrary(p.cwd)
             && s.now.timeIntervalSince(p.started) > 12 * 3600
             && Set(s.procs[p.ppid]?.ports ?? []).isDisjoint(with: p.ports)
     }
@@ -564,6 +567,7 @@ private func stacks(_ s: Snapshot, _ termed: Set<pid_t>) -> [Finding] {
 }
 
 private func projectRoot(_ dir: String) -> String {
+    if isLibrary(dir) { return dir }
     var d = URL(fileURLWithPath: dir)
     while d.path.count > NSHomeDirectory().count {
         if FileManager.default.fileExists(atPath: d.appendingPathComponent(".git").path) { return d.path }
@@ -596,7 +600,8 @@ private func commandLine(_ p: Proc) -> String {
 }
 
 private func scriptHead(_ p: Proc) -> String? {
-    guard let arg = p.args.dropFirst().first(where: { a in !a.hasPrefix("-") && [".py", ".js", ".mjs", ".ts", ".rb", ".sh"].contains(where: a.hasSuffix) }),
+    guard !isLibrary(p.cwd), let arg = p.args.dropFirst().first(where: { a in !a.hasPrefix("-") && [".py", ".js", ".mjs", ".ts", ".rb", ".sh"].contains(where: a.hasSuffix) }),
+          !isLibrary(arg),
           let data = FileManager.default.contents(atPath: arg.hasPrefix("/") ? arg : p.cwd + "/" + arg)
     else { return nil }
     return "The file \(arg) starts with:\n" + String(decoding: data.prefix(1500), as: UTF8.self)
@@ -696,6 +701,7 @@ func demoSnapshot(now: Date = Date()) -> Snapshot {
         p(41, 11, ["node", "server.mjs"], age: 13 * 3600, mem: 20 << 20, ports: [3000], cwd: proj),
         p(42, 40, ["Python", "-m", "uvicorn"], age: 13 * 3600, ports: [8000], cwd: proj),
         p(43, 11, ["node", "fresh.mjs"], age: 60, ports: [5173], cwd: proj),
+        p(44, 1, ["helper", "serve.js"], age: 13 * 3600, ports: [9999], cwd: NSHomeDirectory() + "/Library/Containers/com.example/Data"),
         p(50, 1, ["launchd_sim", sim], age: 5 * 86400, mem: 10 << 20), p(51, 50, ["SpringBoard"], mem: 200 << 20),
         p(60, 1, ["Google Chrome"], path: "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome", mem: 1 << 30),
         p(61, 60, ["renderer"], path: "/Applications/Google Chrome.app/Contents/Frameworks/Google Chrome Framework.framework/Helpers/Google Chrome Helper (Renderer).app/Contents/MacOS/Google Chrome Helper (Renderer)", mem: 1 << 30),
@@ -766,6 +772,10 @@ func selfTest() {
         "close the duplicate tabs in com.google.Chrome, keep the first copy", "-",
         "open chrome://settings/performance in com.google.Chrome", "Cmd-Q com.google.Chrome",
     ])
+    allowed.memorySaver = 2
+    precondition(!findings(allowed).first { $0.id == "browser-app:Google Chrome" }!.steps.contains { $0.text.contains("Memory Saver") })
+    allowed.memorySaver = 0
+    precondition(findings(allowed).first { $0.id == "browser-app:Google Chrome" }!.steps.contains { $0.text.hasPrefix("Turn on Memory Saver. Chrome") })
     var denied = snap
     denied.access["com.google.Chrome"] = .denied
     precondition(findings(denied).first { $0.id == "browser-app:Google Chrome" }!.steps.first?.action?.fix.command

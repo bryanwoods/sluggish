@@ -29,7 +29,22 @@ func prTitle(_ slug: String?, _ ref: String?) -> String? {
 }
 
 // Branch and remote come from the files in .git; a worktree's .git is a file that points to its gitdir, and commondir points to the main repo.
+// ponytail: 5-minute cache per folder; a branch switch shows late. Key on .git/HEAD's mtime if that matters.
+private var gitCache: [String: (at: Date, git: Git?)] = [:]
+
+// macOS shows "Data Access Blocked" when an app touches other apps' containers under ~/Library, and processes
+// such as Docker's helpers run there. Folder context never needs ~/Library, so it is never probed.
+func isLibrary(_ path: String) -> Bool { path.hasPrefix(NSHomeDirectory() + "/Library/") }
+
 func git(_ root: String) -> Git? {
+    if isLibrary(root) { return nil }
+    if let hit = gitCache[root], Date().timeIntervalSince(hit.at) < 300 { return hit.git }
+    let result = readGit(root)
+    gitCache[root] = (Date(), result)
+    return result
+}
+
+private func readGit(_ root: String) -> Git? {
     func read(_ path: String) -> String? { (try? String(contentsOfFile: path, encoding: .utf8))?.trimmingCharacters(in: .whitespacesAndNewlines) }
     func resolve(_ path: String, _ base: String) -> String { path.hasPrefix("/") ? path : URL(fileURLWithPath: base).appendingPathComponent(path).standardized.path }
     var isDir: ObjCBool = false
@@ -87,25 +102,36 @@ func claudeJob(dir: String) -> ClaudeWork? {
     return w
 }
 
+private var transcriptPaths: [String: String] = [:]
+
+// Searches the last 1 MB backwards, as bytes, for the newest record of each type, and parses only that line.
 private func transcript(_ sessionId: String) -> ClaudeWork {
-    let projects = NSHomeDirectory() + "/.claude/projects"
     var w = ClaudeWork()
-    guard let path = ((try? FileManager.default.contentsOfDirectory(atPath: projects)) ?? [])
-            .map({ "\(projects)/\($0)/\(sessionId).jsonl" }).first(where: FileManager.default.fileExists),
-          let fh = FileHandle(forReadingAtPath: path)
-    else { return w }
+    let projects = NSHomeDirectory() + "/.claude/projects"
+    if transcriptPaths[sessionId] == nil {
+        transcriptPaths[sessionId] = ((try? FileManager.default.contentsOfDirectory(atPath: projects)) ?? [])
+            .map { "\(projects)/\($0)/\(sessionId).jsonl" }.first(where: FileManager.default.fileExists)
+    }
+    guard let path = transcriptPaths[sessionId], let fh = FileHandle(forReadingAtPath: path) else { return w }
     defer { try? fh.close() }
     // ponytail: reads the last 1 MB only; a session whose title is older than that shows no title
     let end = (try? fh.seekToEnd()) ?? 0
     try? fh.seek(toOffset: end > 1 << 20 ? end - (1 << 20) : 0)
-    for line in String(decoding: fh.readDataToEndOfFile(), as: UTF8.self).split(separator: "\n")
-    where line.contains("\"ai-title\"") || line.contains("\"pr-link\"") {
-        guard let d = try? JSONSerialization.jsonObject(with: Data(line.utf8)) as? [String: Any] else { continue }
-        if let t = d["aiTitle"] as? String { w.title = t }
-        if let n = d["prNumber"] as? Int {
-            w.pr = n
-            w.prRepo = d["prRepository"] as? String
+    let data = fh.readDataToEndOfFile()
+    func newest(_ type: String, _ key: String) -> [String: Any]? {
+        var upTo = data.endIndex
+        while let hit = data.range(of: Data("\"type\":\"\(type)\"".utf8), options: .backwards, in: data.startIndex..<upTo) {
+            let lineStart = data[..<hit.lowerBound].lastIndex(of: 10).map { $0 + 1 } ?? data.startIndex
+            let lineEnd = data[hit.upperBound...].firstIndex(of: 10) ?? data.endIndex
+            if let d = try? JSONSerialization.jsonObject(with: data[lineStart..<lineEnd]) as? [String: Any], d[key] != nil { return d }
+            upTo = lineStart
         }
+        return nil
+    }
+    w.title = newest("ai-title", "aiTitle")?["aiTitle"] as? String
+    if let d = newest("pr-link", "prNumber") {
+        w.pr = d["prNumber"] as? Int
+        w.prRepo = d["prRepository"] as? String
     }
     return w
 }
