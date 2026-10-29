@@ -5,6 +5,13 @@ if CommandLine.arguments.contains("--selftest") {
     selfTest()
     exit(0)
 }
+if let i = CommandLine.arguments.firstIndex(of: "--explain"), i + 1 < CommandLine.arguments.count {
+    Task {
+        print(await explain(CommandLine.arguments[i + 1]) ?? "", terminator: "")
+        exit(0)
+    }
+    dispatchMain()
+}
 if CommandLine.arguments.contains("--demo") {
     let s = demoSnapshot()
     print(text(s, findings(s)), terminator: "")
@@ -173,19 +180,26 @@ final class Model: ObservableObject {
     }
 
     // The on-device model runs only when someone opens a card's details, because that is the only place its line shows.
+    // It runs in a child copy of whyslow: the model framework allocates several MB that would otherwise stay in the menu bar app.
     func guess(for f: Finding) {
-        guard let e = f.evidence, !asked.contains(e) else { return }
+        guard let e = f.evidence, !asked.contains(e), let me = Bundle.main.executablePath else { return }
         asked.insert(e)
-        Task { guesses[e] = await explain(e) }
+        Task.detached {
+            let line = finish(start(me, ["--explain", e]))
+            await MainActor.run { if !line.isEmpty { self.guesses[e] = line } }
+        }
     }
 
     private func show(_ s: Snapshot, _ fs: [Finding], note: Note?) {
         var s = s
         s.procs = [:]
+        s.children = [:]
         snap = s
         found = fs
         self.note = note
         busy = false
+        // A check allocates and frees a few MB; give the free pages back so they do not count against the app.
+        malloc_zone_pressure_relief(nil, 0)
     }
 }
 

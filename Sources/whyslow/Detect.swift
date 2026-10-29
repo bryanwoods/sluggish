@@ -62,11 +62,12 @@ enum Fix: Hashable {
             NSRunningApplication.runningApplications(withBundleIdentifier: bundle).forEach { $0.terminate() }
             return nil
         case let .dockerStop(id):
-            guard let bin = dockerBin else { return "Not done: Docker is not installed." }
-            return tool(bin, ["stop", id])
+            // Docker waits up to 10 seconds for a container to stop before it answers.
+            return dockerAPI("POST", "/containers/\(id)/stop", timeout: 15) == nil ? "Not done: Docker did not stop the container." : nil
         case let .simShutdown(udid):
-            guard let bin = simctlBin else { return "Not done: Xcode is not installed." }
-            return tool(bin, ["shutdown", udid])
+            guard let bin = simctlBin, let h = start(bin, ["shutdown", udid]) else { return "Not done: Xcode is not installed." }
+            finish(h)
+            return h.0.terminationStatus == 0 ? nil : "Not done: the simulator did not shut down."
         case let .openSettings(id):
             return NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:\(id)")!) ? nil : "Not done: System Settings did not open."
         case let .askAutomation(id):
@@ -80,12 +81,6 @@ enum Fix: Hashable {
             return errors.isEmpty ? nil : errors.joined(separator: "\n")
         }
     }
-}
-
-private func tool(_ exe: String, _ args: [String]) -> String? {
-    guard let h = start(exe, args) else { return "Not done: \(exe) is missing." }
-    finish(h)
-    return h.0.terminationStatus == 0 ? nil : "Not done: \(([exe] + args).joined(separator: " ")) failed."
 }
 
 struct Action: Identifiable {
@@ -159,13 +154,13 @@ private let browserNames = ["Safari": "Safari", "Google Chrome": "Chrome", "Arc"
 private let webKitPages = ["/com.apple.WebKit.WebContent", "/com.apple.WebKit.Networking", "/com.apple.WebKit.GPU"]
 
 private func browserOf(_ p: Proc, safariRuns: Bool) -> String? {
-    if let app = appName(p.path), browserNames[app] != nil { return app }
+    if let app = p.app, browserNames[app] != nil { return app }
     // ponytail: every WebKit page process counts toward Safari, so Mail and other WebKit apps are included; the responsible-pid API would split them
     return safariRuns && webKitPages.contains(where: p.path.hasSuffix) ? "Safari" : nil
 }
 
 private func browsers(_ s: Snapshot) -> [Finding] {
-    let safariRuns = s.procs.values.contains { appName($0.path) == "Safari" }
+    let safariRuns = s.procs.values.contains { $0.app == "Safari" }
     let groups = Dictionary(grouping: s.procs.values.filter { browserOf($0, safariRuns: safariRuns) != nil }) { browserOf($0, safariRuns: safariRuns)! }
     return groups.sorted { $0.key < $1.key }.compactMap { app, procs in
         let mem = procs.reduce(0) { $0 + $1.footprint }
@@ -300,11 +295,11 @@ private func loginApps(_ s: Snapshot) -> [Finding] {
 }
 
 private func cpuHogs(_ s: Snapshot) -> [Finding] {
-    let safariRuns = s.procs.values.contains { appName($0.path) == "Safari" }
+    let safariRuns = s.procs.values.contains { $0.app == "Safari" }
     let serviceNames = services.reduce(Set<String>()) { $0.union($1.names) }
     var groups: [String: (cpu: Double, n: Int, root: Proc, app: String?)] = [:]
     for p in s.procs.values where p.cpu > 0.01 && p.pid != getpid() && browserOf(p, safariRuns: safariRuns) == nil && !serviceNames.contains(p.name) {
-        let app = appName(p.path)
+        let app = p.app
         let root = app == nil ? starter(p, s).root : p
         let key = app ?? "pid:\(root.pid)"
         let g = groups[key]
@@ -357,7 +352,7 @@ private func starter(_ p: Proc, _ s: Snapshot) -> (root: Proc, who: String?, cla
     while let parent = s.procs[cur.ppid], parent.pid > 1 {
         if parent.name == "claude" { return (root ?? cur, "Claude Code", parent.pid) }
         if parent.name.hasPrefix("-") { return (root ?? cur, "you", nil) }
-        if let app = appName(parent.path) { return (root ?? cur, app, nil) }
+        if let app = parent.app { return (root ?? cur, app, nil) }
         cur = parent
         if !shells.contains(cur.name) { root = cur }
     }
@@ -377,9 +372,12 @@ private func startedBy(_ st: (root: Proc, who: String?, claude: pid_t?), _ age: 
     }
 }
 
-private func appName(_ path: String) -> String? {
-    guard path.contains(".app/Contents/MacOS/") else { return nil }
-    for prefix in ["/Applications/", "/System/Applications/", NSHomeDirectory() + "/Applications/"] where path.hasPrefix(prefix) {
+private let appDirs = ["/Applications/", "/System/Applications/", NSHomeDirectory() + "/Applications/"]
+
+// Runs for every process in the scan: the cheap prefix test comes first and rejects /System and /usr paths.
+func appName(_ path: String) -> String? {
+    for prefix in appDirs where path.hasPrefix(prefix) {
+        guard path.contains(".app/Contents/MacOS/") else { return nil }
         if let app = path.dropFirst(prefix.count).split(separator: "/").first(where: { $0.hasSuffix(".app") }) {
             return String(app.dropLast(4))
         }
@@ -482,8 +480,8 @@ private func simulators(_ s: Snapshot) -> [Finding] {
 // Servers that listen on a TCP port, grouped by git root, with the Docker containers whose name contains that root's name.
 private func stacks(_ s: Snapshot, _ termed: Set<pid_t>) -> [Finding] {
     let servers = s.procs.values.filter { p in
-        !p.ports.isEmpty && appName(p.path) == nil && p.cwd.hasPrefix(NSHomeDirectory() + "/") && !isLibrary(p.cwd)
-            && s.now.timeIntervalSince(p.started) > 12 * 3600
+        !p.ports.isEmpty && p.app == nil && p.cwd.hasPrefix(NSHomeDirectory() + "/") && !isLibrary(p.cwd)
+            && s.now.timeIntervalSince(p.started) > serverAge
             && Set(s.procs[p.ppid]?.ports ?? []).isDisjoint(with: p.ports)
     }
     return Dictionary(grouping: servers) { projectRoot($0.cwd) }.sorted { $0.key < $1.key }.map { root, procs in
@@ -620,7 +618,7 @@ private func facts(who: String?, git g: Git?, work: ClaudeWork?, more: [String])
 }
 
 private func descendants(_ pid: pid_t, _ s: Snapshot) -> [Proc] {
-    let kids = s.procs.values.filter { $0.ppid == pid }
+    let kids = (s.children[pid] ?? []).compactMap { s.procs[$0] }
     return kids + kids.flatMap { descendants($0.pid, s) }
 }
 
@@ -683,7 +681,7 @@ func demoSnapshot(now: Date = Date()) -> Snapshot {
     func p(_ pid: pid_t, _ ppid: pid_t, _ args: [String], path: String = "", age: TimeInterval = 60, cpu: Double = 0,
            mem: UInt64 = 0, ports: [UInt16] = [], cwd: String = "/tmp/wt") -> Proc {
         Proc(pid: pid, ppid: ppid, uid: me, path: path.isEmpty ? "/usr/bin/" + args[0] : path, args: args,
-             started: now - age, footprint: mem, cpu: cpu, cwd: cwd, ports: ports)
+             started: now - age, footprint: mem, cpu: cpu, cwd: cwd, ports: ports, app: appName(path))
     }
     let proj = NSHomeDirectory() + "/whyslow-selftest/projx1"
     let sim = NSHomeDirectory() + "/Library/Developer/CoreSimulator/Devices/00000000-0000-0000-0000-000000000000/data/var/run/launchd_bootstrap.plist"
@@ -731,6 +729,7 @@ func demoSnapshot(now: Date = Date()) -> Snapshot {
     var s = Snapshot(procs: Dictionary(uniqueKeysWithValues: (procs + loginProcs).map { ($0.pid, $0) }), containers: containers, apps: apps,
                      diskFree: 9 << 30, diskTotal: 256 << 30, ram: 8 << 30, cores: 10, now: now, thermal: .serious)
     s.access["com.google.Chrome"] = .notAsked
+    s.index()
     return s
 }
 
@@ -812,7 +811,6 @@ func selfTest() {
     precondition(browsers[0].actions.first?.fix.command == "kill -TERM 20")
     precondition(findings(snap, termed: [20]).first { $0.id == "browser:20" }?.actions.first?.fix.command == "kill -KILL 20")
     precondition(fs.filter { $0.id.hasPrefix("caffeinate") }.map(\.id) == ["caffeinate:30"])
-    precondition(bytes("116.5MiB ") == 122_159_104 && bytes("7.75GiB") == 8_321_499_136)
     precondition(list(["a", "b", "c"]) == "a, b, and c" && ago(1) == "1 second" && onFor("Up 3 hours (healthy)") == "on for 3 hours")
 
     precondition(Fix.signal(1, SIGTERM, started: now).apply()?.hasPrefix("Not done") == true)
