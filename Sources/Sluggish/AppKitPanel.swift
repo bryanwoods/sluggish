@@ -47,9 +47,9 @@ final class AppKitPanel: NSObject {
         if panel.isVisible { return close() }
         openedAt = Date()
         if model.snap.map({ openedAt.timeIntervalSince($0.now) > 10 }) ?? true { model.refresh() }
-        render()
         NSApp.activate()
         panel.makeKeyAndOrderFront(nil)
+        render()
     }
 
     private func render() {
