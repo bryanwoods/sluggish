@@ -683,14 +683,14 @@ func ago(_ t: TimeInterval) -> String {
     }
 }
 
-func demoSnapshot(now: Date = Date()) -> Snapshot {
+func demoSnapshot(now: Date = Date(), scenario: String? = nil) -> Snapshot {
     let me = getuid()
     func p(_ pid: pid_t, _ ppid: pid_t, _ args: [String], path: String = "", age: TimeInterval = 60, cpu: Double = 0,
            mem: UInt64 = 0, ports: [UInt16] = [], cwd: String = "/tmp/wt") -> Proc {
         Proc(pid: pid, ppid: ppid, uid: me, path: path.isEmpty ? "/usr/bin/" + args[0] : path, args: args,
              started: now - age, footprint: mem, cpu: cpu, cwd: cwd, ports: ports, app: appName(path))
     }
-    let proj = NSHomeDirectory() + "/sluggish-selftest/projx1"
+    let proj = NSHomeDirectory() + "/sluggish-selftest/" + (scenario == "developer" ? "storefront" : "projx1")
     let sim = NSHomeDirectory() + "/Library/Developer/CoreSimulator/Devices/00000000-0000-0000-0000-000000000000/data/var/run/launchd_bootstrap.plist"
     let chrome = "/Users/x/Library/Caches/ms-playwright/chromium-1/chrome-mac-arm64/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing"
     let procs = [
@@ -738,6 +738,30 @@ func demoSnapshot(now: Date = Date()) -> Snapshot {
     var s = Snapshot(procs: Dictionary(uniqueKeysWithValues: (procs + loginProcs).map { ($0.pid, $0) }), containers: containers, apps: apps,
                      diskFree: 9 << 30, diskTotal: 256 << 30, ram: 8 << 30, cores: 10, now: now, thermal: .serious)
     s.access["com.google.Chrome"] = .notAsked
+    if let scenario {
+        (s.thermal, s.diskFree) = (.nominal, 140 << 30)
+        switch scenario {
+        case "memory":
+            (s.pressure, s.cpuBusy, s.swapUsed, s.memorySaver) = (2, 0.12, 3 << 30, 0)
+            for pid: pid_t in [15, 16, 17, 63, 64, 81] { s.procs[pid]!.cpu = 0 }
+            for pid: pid_t in 600..<624 { s.procs[pid] = p(pid, 60, ["renderer"], path: s.procs[61]!.path, mem: 50 << 20) }
+            s.access["com.google.Chrome"] = .allowed
+            s.tabs["com.google.Chrome"] = Tabs(duplicates: 12, piles: [("docs.google.com", 9), ("youtube.com", 6), ("mail.google.com", 4)])
+        case "calm":
+            (s.procs, s.cpuBusy) = ([:], 0.06)
+        case "developer":
+            (s.ram, s.pressure, s.cpuBusy) = (16 << 30, 2, 0.63)
+            s.procs[81]!.footprint = 8 << 30
+            s.procs[41]!.ppid = 1
+            s.containers = [Container(id: "c1", name: "storefront-db", status: "Up 13 hours", image: "postgres:16", mem: 780 << 20),
+                            Container(id: "c2", name: "storefront-redis", status: "Up 13 hours", image: "redis:7", mem: 120 << 20)]
+            gitCache[proj] = (now, Git(repo: "storefront", branch: "fix/checkout-tax", lastCommit: "Round tax for each line item",
+                                       lastCommitAgo: "14 hours ago", isCopy: false))
+        default:
+            print("Unknown scenario “\(scenario)”. Use memory, calm, or developer.")
+            exit(1)
+        }
+    }
     s.index()
     return s
 }
@@ -758,6 +782,14 @@ func selfTest() {
     (calm.thermal, calm.diskFree, calm.pressure) = (.nominal, 100 << 30, 2)
     precondition(verdict(calm, findings(calm)) == ("Your Mac is short on memory.", "The biggest cause: Apps that start at login.", false), "\(verdict(calm, findings(calm)))")
     precondition(verdict(Snapshot(procs: [:]), []) == ("Your Mac looks fine right now.", nil, true))
+    let hero = demoSnapshot(now: now, scenario: "memory")
+    precondition(verdict(hero, findings(hero)) == ("Your Mac is short on memory.", "The biggest cause: Chrome.", false)
+                 && findings(hero).first?.steps.first?.action?.label == "Close 12 duplicates")
+    precondition(findings(demoSnapshot(now: now, scenario: "calm")).isEmpty)
+    let dev = findings(demoSnapshot(now: now, scenario: "developer"))
+    precondition(dev.first?.summary.hasPrefix("Your containers need only 900 MB.") == true && dev.first?.title == "Docker uses 8.0 GB of memory")
+    precondition(dev.filter { $0.bucket == .leftovers }.map(\.subject) == ["storefront", "a test browser", "caffeinate"], "\(dev.map(\.subject))")
+    precondition(dev.first { $0.subject == "storefront" }!.detail.contains("Branch fix/checkout-tax. Last commit 14 hours ago: “Round tax for each line item”. It started 13 hours ago. The app or terminal that started it is closed."))
     precondition(one("browser-app:Google Chrome").summary == "Each open tab uses memory. Sluggish can find the tabs that you can close.")
     var cool = snap
     cool.thermal = .fair

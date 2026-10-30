@@ -30,7 +30,7 @@ func prTitle(_ slug: String?, _ ref: String?) -> String? {
 
 // Branch and remote come from the files in .git; a worktree's .git is a file that points to its gitdir, and commondir points to the main repo.
 // ponytail: 5-minute cache per folder; a branch switch shows late. Key on .git/HEAD's mtime if that matters.
-private var gitCache: [String: (at: Date, git: Git?)] = [:]
+var gitCache: [String: (at: Date, git: Git?)] = [:]
 
 // macOS shows "Data Access Blocked" when an app touches other apps' containers under ~/Library, and processes
 // such as Docker's helpers run there. Folder context never needs ~/Library, so it is never probed.

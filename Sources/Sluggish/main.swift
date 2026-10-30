@@ -12,8 +12,9 @@ if let i = CommandLine.arguments.firstIndex(of: "--explain"), i + 1 < CommandLin
     }
     dispatchMain()
 }
+let scenario = CommandLine.arguments.drop { $0 != "--scenario" }.dropFirst().first
 if CommandLine.arguments.contains("--demo") {
-    let s = demoSnapshot()
+    let s = demoSnapshot(scenario: scenario)
     print(text(s, findings(s)), terminator: "")
     exit(0)
 }
@@ -47,7 +48,7 @@ if CommandLine.arguments.contains("--bench") {
     exit(0)
 }
 if CommandLine.arguments.contains("--print") {
-    let s = sample()
+    let s = scenario == nil ? sample() : demoSnapshot(scenario: scenario)
     let fs = findings(s)
     guard CommandLine.arguments.contains("--ai") else {
         print(text(s, fs), terminator: "")
@@ -62,7 +63,7 @@ if CommandLine.arguments.contains("--print") {
     dispatchMain()
 }
 if let i = CommandLine.arguments.firstIndex(of: "--snapshot"), i + 1 < CommandLine.arguments.count {
-    let s = CommandLine.arguments.contains("--live") ? sample() : demoSnapshot()
+    let s = CommandLine.arguments.contains("--live") ? sample() : demoSnapshot(scenario: scenario)
     MainActor.assumeIsolated {
         NSApplication.shared.appearance = NSAppearance(named: CommandLine.arguments.contains("--dark") ? .darkAqua : .aqua)
         let model = Model()
