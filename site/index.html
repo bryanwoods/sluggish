@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sluggish: why is your Mac slow?</title>
+<meta name="description" content="Click the gauge in your menu bar. Sluggish names the cause in plain words and gives you one safe fix. Nothing runs until you click.">
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<main>
+<nav><a href="/">Sluggish</a><a href="/buy/">Buy</a><a href="/about/">About</a></nav>
+
+<h1>Why is your Mac slow? One line tells you.</h1>
+<p>Click the gauge in your menu bar. Sluggish names the cause in plain words and gives you one safe fix. Nothing runs until you click, and it works on older Intel Macs too.</p>
+<div class="buttons">
+<a class="button" href="/download/Sluggish.zip">Download the free trial</a>
+<a class="button quiet" href="/buy/">Buy for $12</a>
+</div>
+<p class="sub">No cleanup. No scare screens. No subscription. For macOS 14 and later, on Apple silicon and Intel. A download of less than 1 MB.</p>
+<img src="/shots/hero.png" width="400" alt="The Sluggish panel: Your Mac is short on memory. The biggest cause: Chrome.">
+
+<h2>How it works</h2>
+<ol>
+<li>Click the gauge in your menu bar.</li>
+<li>Read the top line. It names the main cause, for example: "Your Mac is short on memory. The biggest cause: Chrome."</li>
+<li>Read the card under it, or click its one button. The button quits an app, closes duplicate tabs, or opens the correct page of System Settings.</li>
+</ol>
+
+<h2>What it finds</h2>
+<ul>
+<li><strong>Your Mac is too hot.</strong> macOS slows the processor to protect the hardware. Sluggish tells you why, and what to do.</li>
+<li><strong>A browser uses too much memory.</strong> It counts duplicate tabs and many tabs from one site. It can close the duplicates for you.</li>
+<li><strong>Your disk is almost full.</strong> It opens Storage settings, so you can see what uses the space.</li>
+<li><strong>Too many apps start by themselves.</strong> It names them, shows their memory, and opens Login Items.</li>
+<li><strong>Photos, iCloud or Spotlight is busy.</strong> This is normal. Sluggish tells you that it stops by itself.</li>
+</ul>
+<img src="/shots/details.png" width="400" alt="A Sluggish card with its details open">
+
+<h2>What Sluggish never does</h2>
+<ul>
+<li>It never deletes files.</li>
+<li>It never quits an app unless you click the button. When you click Quit, the app asks you to save your work, the same as Cmd-Q.</li>
+<li>It never runs in the background. When the panel is closed, it checks nothing.</li>
+<li>It never tells you that your Mac is infected.</li>
+<li>It never sends your data anywhere. On macOS 26 and later, an Apple model on your Mac writes one line about an unknown process, and nothing leaves your Mac. The one exception is an opt-in developer setting that asks the GitHub command-line tool for pull request titles.</li>
+</ul>
+
+<h2>Nothing runs until you click</h2>
+<p>A tool for a slow Mac must not slow the Mac.</p>
+<ul>
+<li>No processor time and 0 wakeups while the panel is closed. No daemon, no timer.</li>
+<li>About 10 ms of processor time for each check.</li>
+<li>No permissions at install. It asks only to read your browser tabs, and only when you click "See my open tabs".</li>
+</ul>
+
+<h2>For developers</h2>
+<p><strong>See what your AI coding agents left running, and which session started it.</strong> Sluggish shows a developer card only when the cause exists. It finds:</p>
+<ul>
+<li>the Docker VM, and how much memory your containers really need</li>
+<li>dev servers left running for days, grouped by git repo and branch, with the pull request title</li>
+<li>test browsers that Playwright did not close, and booted Xcode simulators</li>
+<li><code>caffeinate</code> with no time limit</li>
+<li>processes that Claude Code started, and the session or job that started them</li>
+</ul>
+<p>Run <code>Sluggish --print</code> in Terminal to get the same report as text.</p>
+<img src="/shots/developer.png" width="400" alt="The Left running section of Sluggish, open">
+
+<h2>Price</h2>
+<p><strong>$12, one time.</strong> Use it on all of your own Macs. Your first 10 checks are free, and every feature works in the trial. All 1.x updates are free.</p>
+<div class="buttons"><a class="button" href="/buy/">Buy for $12</a></div>
+
+<h2>Questions</h2>
+<h3>Is Sluggish a cleaner app?</h3>
+<p>No. It does not delete files or clear caches. It tells you why your Mac is slow, and you choose what to do.</p>
+<h3>How is Sluggish different from other apps that explain a slow Mac?</h3>
+<p>Sluggish runs nothing in the background. It never deletes or moves files. It works on Intel Macs with macOS 14. It has no charts and no history. You get the answer and one fix.</p>
+<h3>Will it make my Mac faster?</h3>
+<p>Sluggish does not change your Mac by itself. It shows the cause and one fix. The fix removes the cause that Sluggish found.</p>
+<h3>What counts as a check in the trial?</h3>
+<p>Each time you open the panel and Sluggish looks at your Mac. Checks within one hour count as one.</p>
+<h3>Why does it ask to control Safari or Chrome?</h3>
+<p>macOS calls the permission to read tab addresses "control". Sluggish uses it to find duplicate tabs. It closes tabs only when you click a button. Every other card works without this permission.</p>
+<h3>What if Sluggish says that my Mac looks fine?</h3>
+<p>Then Sluggish found no cause at that moment. Open it again at the next slow moment. If your Mac is still slow, write to us. Each report helps Sluggish find more causes.</p>
+<h3>Does it work on Intel Macs?</h3>
+<p>Yes. It is a universal app for Apple silicon and Intel Macs with macOS 14 or later.</p>
+<h3>What if I do not like it?</h3>
+<p>Write to us within 30 days for a full refund.</p>
+
+<footer>Made by one developer. Contact: <a href="mailto:[email address]">[email address]</a>. The app collects no data.<br><a href="/privacy/">Privacy</a> · <a href="/terms/">Terms</a> · <a href="/refund/">Refunds</a> · <a href="/about/">About</a></footer>
+</main>
+</body>
+</html>
