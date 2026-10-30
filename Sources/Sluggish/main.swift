@@ -194,7 +194,7 @@ final class Model: ObservableObject {
     }
 
     // The on-device model runs only when someone opens a card's details, because that is the only place its line shows.
-    // It runs in a child copy of whyslow: the model framework allocates several MB that would otherwise stay in the menu bar app.
+    // It runs in a child copy of Sluggish: the model framework allocates several MB that would otherwise stay in the menu bar app.
     func guess(for f: Finding) {
         guard let e = f.evidence, !asked.contains(e), let me = Bundle.main.executablePath else { return }
         asked.insert(e)

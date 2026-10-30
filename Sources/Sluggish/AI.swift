@@ -1,6 +1,7 @@
 import Foundation
 import FoundationModels
 
+@available(macOS 26, *)
 @Generable
 struct Guess {
     @Guide(description: "What the process itself does, from the command and the file contents. A verb phrase in the present tense, at most 15 words, in plain English")
@@ -10,6 +11,7 @@ struct Guess {
 }
 
 func explain(_ evidence: String) async -> String? {
+    guard #available(macOS 26, *) else { return nil }
     guard case .available = SystemLanguageModel.default.availability else { return nil }
     let session = LanguageModelSession(instructions: """
         You explain to a developer what a process on their Mac does. Use only the evidence.

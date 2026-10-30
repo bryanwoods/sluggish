@@ -21,8 +21,8 @@ func automation(_ bundleID: String, ask: Bool) -> Access {
     }
 }
 
-// Runs in /usr/bin/osascript, not NSAppleScript: loading the AppleScript engine into whyslow costs about 15 MB
-// for the life of the app. macOS still applies whyslow's Automation permission, because whyslow starts the child.
+// Runs in /usr/bin/osascript, not NSAppleScript: loading the AppleScript engine into Sluggish costs about 15 MB
+// for the life of the app. macOS still applies Sluggish's Automation permission, because Sluggish starts the child.
 private func appleScript(_ source: String) -> String? {
     guard let h = start("/usr/bin/osascript", ["-e", source]) else { return nil }
     let out = finish(h)

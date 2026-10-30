@@ -21,7 +21,7 @@ final class AppKitPanel: NSObject {
         self.model = model
         item = statusItem ? NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength) : nil
         super.init()
-        item?.button?.image = NSImage(systemSymbolName: "gauge.with.dots.needle.67percent", accessibilityDescription: "whyslow")
+        item?.button?.image = NSImage(systemSymbolName: "gauge.with.dots.needle.67percent", accessibilityDescription: "Sluggish")
         item?.button?.target = self
         item?.button?.action = #selector(toggle)
         // A check changes several published properties at once; build the view tree once per run-loop turn.
@@ -230,7 +230,7 @@ final class AppKitPanel: NSObject {
             menu.addItem(pr)
         }
         menu.addItem(.separator())
-        menu.addItem(item("Quit whyslow") { NSApp.terminate(nil) })
+        menu.addItem(item("Quit Sluggish") { NSApp.terminate(nil) })
         NSMenu.popUpContextMenu(menu, with: NSApp.currentEvent ?? NSEvent(), for: panel.contentView!)
     }
 

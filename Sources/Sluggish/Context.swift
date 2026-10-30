@@ -8,9 +8,9 @@ struct Git {
 
 // /usr/bin/git and /usr/bin/xcrun are stubs that show an install dialog when the developer tools are missing, so only real binaries are used.
 private let developerDir = (try? FileManager.default.destinationOfSymbolicLink(atPath: "/var/db/xcode_select_link")) ?? "/Library/Developer/CommandLineTools"
-// WHYSLOW_NO_TOOLS=1 hides every optional tool, to check that the cards still read well without them.
+// SLUGGISH_NO_TOOLS=1 hides every optional tool, to check that the cards still read well without them.
 func executable(_ paths: [String]) -> String? {
-    ProcessInfo.processInfo.environment["WHYSLOW_NO_TOOLS"] == nil ? paths.first { FileManager.default.isExecutableFile(atPath: $0) } : nil
+    ProcessInfo.processInfo.environment["SLUGGISH_NO_TOOLS"] == nil ? paths.first { FileManager.default.isExecutableFile(atPath: $0) } : nil
 }
 let gitBin = executable(["/opt/homebrew/bin/git", "/usr/local/bin/git", developerDir + "/usr/bin/git", "/Library/Developer/CommandLineTools/usr/bin/git"])
 let simctlBin = executable([developerDir + "/usr/bin/simctl"])

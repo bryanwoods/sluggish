@@ -21,7 +21,7 @@ enum Fix: Hashable {
     var command: String {
         switch self {
         case let .openSettings(id): return "open x-apple.systempreferences:\(id)"
-        case let .askAutomation(id): return "ask macOS to let whyslow read the tab addresses of \(id)"
+        case let .askAutomation(id): return "ask macOS to let Sluggish read the tab addresses of \(id)"
         case let .closeDuplicateTabs(id): return "close the duplicate tabs in \(id), keep the first copy"
         case let .openTab(id, url): return "open \(url) in \(id)"
         case let .signal(pid, sig, _): return "kill -\(sig == SIGKILL ? "KILL" : "TERM") \(pid)"
@@ -183,10 +183,10 @@ private func browsers(_ s: Snapshot) -> [Finding] {
                     steps.append(Step(text: "Many tabs are from the same site: \(list(t.piles.map { "\($0.n) from \(siteNames[$0.host] ?? $0.host)" })). Close the ones that you are done with."))
                 }
             case .notAsked?:
-                steps.append(Step(text: "whyslow can look at your open tabs and find the ones that you can close. macOS calls this permission “control”.",
+                steps.append(Step(text: "Sluggish can look at your open tabs and find the ones that you can close. macOS calls this permission “control”.",
                                   action: Action(label: "See my open tabs", fix: .askAutomation(id))))
             case .denied?:
-                steps.append(Step(text: "To find tabs that you can close, turn on \(name) under whyslow in Privacy & Security > Automation.",
+                steps.append(Step(text: "To find tabs that you can close, turn on \(name) under Sluggish in Privacy & Security > Automation.",
                                   action: Action(label: "Open Automation settings", fix: .openSettings("com.apple.preference.security?Privacy_Automation"))))
             default:
                 break
@@ -207,7 +207,7 @@ private func browsers(_ s: Snapshot) -> [Finding] {
         }
         let summary = cpu >= 1 ? "A busy page takes processor time from your other apps."
             : !found.isEmpty ? "\(list(found)) are open."
-            : s.access[bundleID ?? ""] == .notAsked ? "Each open tab uses memory. whyslow can find the tabs that you can close."
+            : s.access[bundleID ?? ""] == .notAsked ? "Each open tab uses memory. Sluggish can find the tabs that you can close."
             : "Each open tab uses memory. Close the tabs that you do not need."
         return Finding(
             id: "browser-app:\(app)", bucket: cpu >= 1 ? .now : .always,
@@ -690,7 +690,7 @@ func demoSnapshot(now: Date = Date()) -> Snapshot {
         Proc(pid: pid, ppid: ppid, uid: me, path: path.isEmpty ? "/usr/bin/" + args[0] : path, args: args,
              started: now - age, footprint: mem, cpu: cpu, cwd: cwd, ports: ports, app: appName(path))
     }
-    let proj = NSHomeDirectory() + "/whyslow-selftest/projx1"
+    let proj = NSHomeDirectory() + "/sluggish-selftest/projx1"
     let sim = NSHomeDirectory() + "/Library/Developer/CoreSimulator/Devices/00000000-0000-0000-0000-000000000000/data/var/run/launchd_bootstrap.plist"
     let chrome = "/Users/x/Library/Caches/ms-playwright/chromium-1/chrome-mac-arm64/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing"
     let procs = [
@@ -758,7 +758,7 @@ func selfTest() {
     (calm.thermal, calm.diskFree, calm.pressure) = (.nominal, 100 << 30, 2)
     precondition(verdict(calm, findings(calm)) == ("Your Mac is short on memory.", "The biggest cause: Apps that start at login.", false), "\(verdict(calm, findings(calm)))")
     precondition(verdict(Snapshot(procs: [:]), []) == ("Your Mac looks fine right now.", nil, true))
-    precondition(one("browser-app:Google Chrome").summary == "Each open tab uses memory. whyslow can find the tabs that you can close.")
+    precondition(one("browser-app:Google Chrome").summary == "Each open tab uses memory. Sluggish can find the tabs that you can close.")
     var cool = snap
     cool.thermal = .fair
     precondition(!findings(cool).contains { $0.id == "heat" })
