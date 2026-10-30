@@ -6,13 +6,12 @@ import ServiceManagement
 @MainActor
 final class AppKitPanel: NSObject {
     let model: Model
-    var forceOpen = false
     private let item: NSStatusItem?
     private let panel = Panel()
     private var watch: AnyCancellable?
     private var openedAt = Date()
     private var showMore = false
-    private var showLeftovers = false
+    var showLeftovers = false
     private var targets: [Target] = []
     private var renderQueued = false
     private var animateNext = false
@@ -110,7 +109,7 @@ final class AppKitPanel: NSObject {
         for f in main.prefix(3) { cards.addArrangedSubview(card(f)) }
         if main.count > 3 {
             cards.addArrangedSubview(fold("More causes", "\(main.count - 3)", open: showMore) { [weak self] in self?.showMore.toggle(); self?.animateNext = true; self?.render() })
-            if showMore || forceOpen { for f in main.dropFirst(3) { cards.addArrangedSubview(card(f)) } }
+            if showMore { for f in main.dropFirst(3) { cards.addArrangedSubview(card(f)) } }
         }
         if !left.isEmpty {
             cards.addArrangedSubview(fold("Left running", "\(left.count) · \(size(left.reduce(0) { $0 + $1.bytes }))", open: showLeftovers) { [weak self] in
@@ -118,7 +117,7 @@ final class AppKitPanel: NSObject {
                 self?.animateNext = true
                 self?.render()
             })
-            if showLeftovers || forceOpen { for f in left { cards.addArrangedSubview(card(f)) } }
+            if showLeftovers { for f in left { cards.addArrangedSubview(card(f)) } }
         }
         let scroll = NSScrollView()
         scroll.drawsBackground = false
@@ -133,7 +132,7 @@ final class AppKitPanel: NSObject {
         page.frame = NSRect(x: 0, y: 0, width: 372, height: height)
         scroll.documentView = page
         NSLayoutConstraint.activate([scroll.widthAnchor.constraint(equalToConstant: 372),
-                                     scroll.heightAnchor.constraint(equalToConstant: min(height, (NSScreen.main?.visibleFrame.height ?? 800) - 260))])
+                                     scroll.heightAnchor.constraint(equalToConstant: item == nil ? height : min(height, (NSScreen.main?.visibleFrame.height ?? 800) - 260))])
         root.addArrangedSubview(scroll)
 
         let line = NSBox()
@@ -151,7 +150,7 @@ final class AppKitPanel: NSObject {
     }
 
     private func card(_ f: Finding) -> NSView {
-        let open = forceOpen || model.openCard == f.id
+        let open = model.openCard == f.id
         let primary = f.steps.compactMap(\.action).first ?? f.actions.first
         let icon: NSView
         if f.icon.hasPrefix("/") {

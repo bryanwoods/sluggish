@@ -70,7 +70,7 @@ if let i = CommandLine.arguments.firstIndex(of: "--snapshot"), i + 1 < CommandLi
         model.snap = s
         model.found = findings(s)
         let panel = AppKitPanel(model: model, statusItem: false)
-        panel.forceOpen = CommandLine.arguments.contains("--open")
+        if CommandLine.arguments.contains("--open") { (panel.showLeftovers, model.openCard) = (true, model.found.first?.id) }
         snapshot(panel.content(), to: CommandLine.arguments[i + 1])
     }
     exit(0)
