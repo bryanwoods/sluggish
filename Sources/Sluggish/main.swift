@@ -50,6 +50,11 @@ if CommandLine.arguments.contains("--bench") {
 if CommandLine.arguments.contains("--print") {
     let s = scenario == nil ? sample() : demoSnapshot(scenario: scenario)
     let fs = findings(s)
+    if !validLicense(UserDefaults.standard.string(forKey: "license")), countCheck() > 10 {
+        let v = verdict(s, fs)
+        print([v.headline, v.cause, buyLine].compactMap { $0 }.joined(separator: "\n"))
+        exit(0)
+    }
     guard CommandLine.arguments.contains("--ai") else {
         print(text(s, fs), terminator: "")
         exit(0)
@@ -143,12 +148,16 @@ final class Model: ObservableObject {
     @Published var note: Note?
     @Published var guesses: [String: String] = [:]
     @Published var openCard: String?
+    @Published var licensed = validLicense(UserDefaults.standard.string(forKey: "license"))
+    @Published var used = UserDefaults.standard.integer(forKey: "checks")
+    var locked: Bool { !licensed && used > 10 }
     private var asked: Set<String> = []
     private var termed: Set<pid_t> = []
 
     func refresh(fresh: Bool = false) {
         guard !busy else { return }
         busy = true
+        if !licensed { used = countCheck() }
         if fresh { forgetCaches() }
         let termed = termed
         Task.detached {

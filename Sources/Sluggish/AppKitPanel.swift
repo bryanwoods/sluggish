@@ -74,8 +74,9 @@ final class AppKitPanel: NSObject {
 
     func content() -> NSView {
         targets = []
-        let main = model.found.filter { $0.bucket != .leftovers }
-        let left = model.found.filter { $0.bucket == .leftovers }
+        let shown = model.locked ? [] : model.found
+        let main = shown.filter { $0.bucket != .leftovers }
+        let left = shown.filter { $0.bucket == .leftovers }
         let root = column(spacing: 12)
         root.edgeInsets = NSEdgeInsets(top: 14, left: 14, bottom: 14, right: 14)
         root.widthAnchor.constraint(equalToConstant: 400).isActive = true
@@ -106,6 +107,14 @@ final class AppKitPanel: NSObject {
         }
 
         let cards = column(spacing: 12)
+        if model.locked {
+            let buttons = row(spacing: 10, [
+                button("Buy Sluggish", prominent: true, tip: "", enabled: true) { NSWorkspace.shared.open(URL(string: "https://sluggishapp.com/buy")!) },
+                button("Enter license key", prominent: false, tip: "", enabled: true) { [weak self] in self?.enterKey() },
+            ])
+            let text = column(spacing: 8, [label(buyLine, .preferredFont(forTextStyle: .callout), wraps: 352), buttons])
+            cards.addArrangedSubview(boxed(text, padding: 10, radius: 10, fill: faded(.labelColor, 0.04), width: 372))
+        }
         for f in main.prefix(3) { cards.addArrangedSubview(card(f)) }
         if main.count > 3 {
             cards.addArrangedSubview(fold("More causes", "\(main.count - 3)", open: showMore) { [weak self] in self?.showMore.toggle(); self?.animateNext = true; self?.render() })
@@ -146,6 +155,9 @@ final class AppKitPanel: NSObject {
             iconButton("arrow.clockwise", tip: "Check again", enabled: !model.busy) { [weak self] in self?.model.refresh(fresh: true) },
             iconButton("ellipsis.circle", tip: nil) { [weak self] in self?.showMenu() },
         ]))
+        if !model.licensed, model.used <= 10 {
+            root.addArrangedSubview(label("Free trial: \(10 - model.used) of 10 checks left", .preferredFont(forTextStyle: .caption1), .secondaryLabelColor))
+        }
         return root
     }
 
@@ -228,9 +240,34 @@ final class AppKitPanel: NSObject {
             pr.state = UserDefaults.standard.bool(forKey: "prTitles") ? .on : .off
             menu.addItem(pr)
         }
+        if !model.licensed { menu.addItem(item("Enter license key…") { [weak self] in self?.enterKey() }) }
         menu.addItem(.separator())
         menu.addItem(item("Quit Sluggish") { NSApp.terminate(nil) })
         NSMenu.popUpContextMenu(menu, with: NSApp.currentEvent ?? NSEvent(), for: panel.contentView!)
+    }
+
+    private func enterKey(_ hint: String = "Paste the key from the page that opened after you paid.") {
+        // An app without a main menu gets no Cmd-V in text fields.
+        let edit = NSMenu()
+        edit.addItem(withTitle: "Paste", action: #selector(NSText.paste(_:)), keyEquivalent: "v")
+        NSApp.mainMenu = NSMenu()
+        NSApp.mainMenu!.addItem(withTitle: "", action: nil, keyEquivalent: "").submenu = edit
+        close()
+        let alert = NSAlert()
+        alert.messageText = "Enter your license key"
+        alert.informativeText = hint
+        let field = NSTextField(frame: NSRect(x: 0, y: 0, width: 300, height: 22))
+        alert.accessoryView = field
+        alert.addButton(withTitle: "OK")
+        alert.addButton(withTitle: "Cancel")
+        alert.window.initialFirstResponder = field
+        guard alert.runModal() == .alertFirstButtonReturn else { return }
+        let key = field.stringValue.filter { !$0.isWhitespace }
+        guard validLicense(key) else { return enterKey("This key does not work. Copy the whole key again, and paste it here.") }
+        UserDefaults.standard.set(key, forKey: "license")
+        model.licensed = true
+        model.note = Note(text: "Thank you. Sluggish is unlocked.")
+        toggle()
     }
 
     // MARK: building blocks

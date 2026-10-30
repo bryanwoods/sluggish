@@ -1,4 +1,5 @@
 import AppKit
+import CryptoKit
 import Foundation
 
 enum Bucket: String, CaseIterable {
@@ -865,5 +866,20 @@ func selfTest() {
     precondition(Fix.signal(sleeper.processIdentifier, SIGTERM, started: started).apply() == nil)
     sleeper.waitUntilExit()
     precondition(sleeper.terminationReason == .uncaughtSignal && sleeper.terminationStatus == SIGTERM)
+
+    let signer = Curve25519.Signing.PrivateKey()
+    func b64(_ d: Data) -> String { d.base64EncodedString().replacingOccurrences(of: "+", with: "-").replacingOccurrences(of: "/", with: "_").replacingOccurrences(of: "=", with: "") }
+    func key(_ json: String, signed: String? = nil) -> String {
+        "SLUG1-" + b64(Data(json.utf8)) + "." + b64(try! signer.signature(for: Data((signed ?? json).utf8)))
+    }
+    let good = key(#"{"t":"txn_01","d":"2026-10-30"}"#)
+    precondition(validLicense(good, signer.publicKey))
+    precondition(!validLicense(good) && !validLicense(nil, signer.publicKey) && !validLicense("SLUG1-", signer.publicKey))
+    precondition(!validLicense(good.replacingOccurrences(of: "SLUG1-", with: "SLUG2-"), signer.publicKey))
+    precondition(!validLicense(key(#"{"t":"txn_02","d":"2026-10-30"}"#, signed: #"{"t":"txn_01","d":"2026-10-30"}"#), signer.publicKey))
+    let trial = UserDefaults(suiteName: "app.sluggish.selftest")!
+    trial.removePersistentDomain(forName: "app.sluggish.selftest")
+    precondition([0, 1800, 3599, 3600, 7300, 7000, 3000].map { countCheck(trial, now: now + Double($0)) } == [1, 1, 1, 2, 3, 3, 4])
+    trial.removePersistentDomain(forName: "app.sluggish.selftest")
     print("selftest ok")
 }
