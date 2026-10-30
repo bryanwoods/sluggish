@@ -1,0 +1,7 @@
+name = "sluggish-license"
+main = "worker.js"
+compatibility_date = "2026-10-01"
+
+[vars]
+PADDLE_API = "https://api.paddle.com"
+PRICE_ID = "pri_REPLACE_WITH_THE_12_DOLLAR_PRICE"
