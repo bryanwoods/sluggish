@@ -72,6 +72,7 @@ if let i = CommandLine.arguments.firstIndex(of: "--snapshot"), i + 1 < CommandLi
     MainActor.assumeIsolated {
         NSApplication.shared.appearance = NSAppearance(named: CommandLine.arguments.contains("--dark") ? .darkAqua : .aqua)
         let model = Model()
+        model.licensed = true
         model.snap = s
         model.found = findings(s)
         let panel = AppKitPanel(model: model, statusItem: false)
