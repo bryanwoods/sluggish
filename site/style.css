@@ -161,8 +161,8 @@ details p { color: var(--muted); margin: 10px 0 0; }
   summary { font-size: 17px; }
   .home footer { margin-top: 56px; }
 }
-.button.off, .button:disabled { cursor: default; }
-.button.off:hover, .button:disabled:hover { transform: none; }
+.button:disabled { cursor: default; }
+.button:disabled:hover { transform: none; }
 
 /* Help */
 .help main { max-width: 720px; padding: 28px 20px 64px; }
