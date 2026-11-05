@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mac Hot and Slow? Why It Happens and How to Fix It</title>
+<meta name="description" content="A hot Mac slows down on purpose to protect its hardware. Learn why kernel_task shows up, find the app that makes the heat, and cool your Mac down.">
+<link rel="canonical" href="https://sluggishapp.com/help/mac-too-hot/">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Mac hot and slow? Why it happens and how to fix it">
+<meta property="og:description" content="Why a hot Mac slows down, what kernel_task does, and how to cool it down.">
+<meta property="og:url" content="https://sluggishapp.com/help/mac-too-hot/">
+<meta property="og:image" content="https://sluggishapp.com/shots/hero.png">
+<link rel="icon" href="../../icon.png">
+<link rel="stylesheet" href="../../style.css">
+<script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Article","headline":"Why your Mac slows down when it gets hot","description":"A hot Mac slows down on purpose to protect the hardware. Learn why kernel_task shows up and how to cool your Mac down.","datePublished":"2026-11-05","dateModified":"2026-11-05","author":{"@type":"Person","name":"Bryan Woods","url":"https://sluggishapp.com/about/"},"publisher":{"@type":"Organization","name":"Sluggish","url":"https://sluggishapp.com/","logo":"https://sluggishapp.com/icon.png"},"mainEntityOfPage":"https://sluggishapp.com/help/mac-too-hot/"},{"@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Help","item":"https://sluggishapp.com/help/"},{"@type":"ListItem","position":2,"name":"Mac too hot","item":"https://sluggishapp.com/help/mac-too-hot/"}]}]}</script>
+</head>
+<body class="help">
+<header class="top"><div class="wrap"><nav><a class="brand" href="../../"><img src="../../icon.png" alt="" width="30" height="30">Sluggish</a><a href="../">Help</a><a href="../../about/">About</a><a class="button small" href="../../download/Sluggish.zip">Download</a></nav></div></header>
+<main>
+<p class="crumbs"><a href="../">Help</a> › Mac too hot</p>
+<h1>Why your Mac slows down when it gets hot</h1>
+<p class="lede">When a Mac gets too hot, macOS slows the processor on purpose to protect the hardware. To get the speed back, find what makes the heat and let the Mac cool down.</p>
+<div class="answer"><b>Quick fix</b>Quit the app that works hardest, put the Mac on a hard, flat surface, and keep the air vents clear. The speed comes back as the Mac cools.</div>
+
+<h2>Why a hot Mac gets slow</h2>
+<p>Every Mac has a safe temperature range. When the processor gets near the top of that range, macOS lowers its speed, because a slower processor makes less heat. Nothing breaks, but everything takes longer: apps open slowly, video stutters, and the fans get loud.</p>
+<p>A MacBook Air has no fan, so it slows down sooner during long, heavy work, such as a video export.</p>
+
+<h2>What is kernel_task?</h2>
+<p>On a hot Mac, Activity Monitor often shows a process named <code>kernel_task</code> at the top of the CPU list. It looks like the cause, but it is part of the cure. Apple says that kernel_task helps control the processor temperature (<a href="https://support.apple.com/en-us/102172">Apple Support</a>). It makes the processor less available to the apps that use it the most, so the processor can cool down.</p>
+<p>When the Mac is cooler, kernel_task goes back to normal by itself. Do not try to quit it.</p>
+
+<h2>What makes a Mac hot</h2>
+<ul>
+<li>An app that works hard for a long time: a video export, a game, a large build, or a browser tab with a heavy web page.</li>
+<li>Blocked air vents, for example a laptop on a bed, a sofa or your lap.</li>
+<li>A warm room or direct sunlight.</li>
+<li>A stuck process that uses the processor and never stops.</li>
+</ul>
+
+<h2>How to find the app that makes the heat</h2>
+<ol class="steps">
+<li>Open Activity Monitor: press <kbd>Command</kbd>-<kbd>Space</kbd>, type “Activity Monitor”, and press <kbd>Return</kbd>.</li>
+<li>Click <b>CPU</b>, then click the <b>% CPU</b> column so that the biggest number is at the top.</li>
+<li>Skip kernel_task. The next app on the list is usually the one that makes the heat.</li>
+</ol>
+
+<h2>How to cool your Mac down</h2>
+<ol class="steps">
+<li>Save your work, then quit the app at the top of the CPU list. If it does not respond, select it in Activity Monitor and click the stop button (✕) in the toolbar.</li>
+<li>Put the Mac on a hard, flat surface, such as a desk or a table, and keep the air vents clear.</li>
+<li>Move out of direct sunlight or into a cooler room.</li>
+<li>Wait a few minutes. The speed comes back as the temperature goes down.</li>
+</ol>
+
+<h2>When to get help</h2>
+<p>Sometimes a Mac stays hot when nothing works hard, with kernel_task at the top of the list for a long time. If that happens, contact Apple Support. A fan or a temperature sensor can have a problem.</p>
+
+<section class="cta">
+<img src="../../icon.png" alt="" width="88" height="88">
+<div>
+<h2>Sluggish tells you when heat is the cause</h2>
+<p>Click the gauge in your menu bar. If your Mac is too hot, Sluggish says so in one line. It also shows which apps keep the processor busy, and what to do.</p>
+<a class="button" href="../../download/Sluggish.zip">Download Sluggish</a>
+<p class="fine">Your first 10 checks are free, then $12 one time. macOS 14 or later, Apple silicon and Intel.</p>
+</div>
+</section>
+
+<section class="related"><h2>Other causes of a slow Mac</h2><ul>
+<li><a href="../chrome-using-too-much-memory/">Your browser uses too much memory</a></li>
+<li><a href="../mac-storage-full/">Your disk is almost full</a></li>
+<li><a href="../mac-slow-startup-login-items/">Too many apps start by themselves</a></li>
+<li><a href="../photos-icloud-spotlight-busy/">Photos, iCloud or Spotlight is busy</a></li>
+</ul></section>
+
+<p class="byline">By <a href="../../about/">Bryan Woods</a>, who makes Sluggish. Updated November 5, 2026.</p>
+</main>
+<footer><span>Made by Bryan Woods. The app collects no data. Contact: <a href="mailto:bryanwoods4e@gmail.com">bryanwoods4e@gmail.com</a></span><nav><a href="../">Help</a><a href="../../privacy/">Privacy</a><a href="../../terms/">Terms</a><a href="../../refund/">Refunds</a><a href="../../about/">About</a></nav></footer>
+</body>
+</html>

@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mac Slow After an Update? Photos, iCloud and Spotlight</title>
+<meta name="description" content="After a macOS update or a new Mac, Photos, iCloud and Spotlight can keep your Mac busy for hours. Here is why it is normal and how to help it finish.">
+<link rel="canonical" href="https://sluggishapp.com/help/photos-icloud-spotlight-busy/">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Mac slow after an update? Photos, iCloud and Spotlight are busy">
+<meta property="og:description" content="Why your Mac is busy after an update, and how to let the work finish sooner.">
+<meta property="og:url" content="https://sluggishapp.com/help/photos-icloud-spotlight-busy/">
+<meta property="og:image" content="https://sluggishapp.com/shots/hero.png">
+<link rel="icon" href="../../icon.png">
+<link rel="stylesheet" href="../../style.css">
+<script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Article","headline":"Slow Mac after an update? Photos, iCloud or Spotlight is busy","description":"After a macOS update or a new Mac, Photos, iCloud and Spotlight can keep your Mac busy for hours. It is normal and stops by itself.","datePublished":"2026-11-05","dateModified":"2026-11-05","author":{"@type":"Person","name":"Bryan Woods","url":"https://sluggishapp.com/about/"},"publisher":{"@type":"Organization","name":"Sluggish","url":"https://sluggishapp.com/","logo":"https://sluggishapp.com/icon.png"},"mainEntityOfPage":"https://sluggishapp.com/help/photos-icloud-spotlight-busy/"},{"@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Help","item":"https://sluggishapp.com/help/"},{"@type":"ListItem","position":2,"name":"Photos, iCloud, Spotlight","item":"https://sluggishapp.com/help/photos-icloud-spotlight-busy/"}]}]}</script>
+</head>
+<body class="help">
+<header class="top"><div class="wrap"><nav><a class="brand" href="../../"><img src="../../icon.png" alt="" width="30" height="30">Sluggish</a><a href="../">Help</a><a href="../../about/">About</a><a class="button small" href="../../download/Sluggish.zip">Download</a></nav></div></header>
+<main>
+<p class="crumbs"><a href="../">Help</a> › Photos, iCloud, Spotlight</p>
+<h1>Slow Mac after an update? Photos, iCloud or Spotlight is busy</h1>
+<p class="lede">After a macOS update, a new Mac, or a big photo import, your Mac does hours of work in the background. Photos analyzes your pictures, iCloud syncs your files, and Spotlight indexes your disk again. This is normal, and it stops by itself.</p>
+<div class="answer"><b>Quick fix</b>Leave your Mac on and plugged in for a few hours when you do not need it, for example overnight. The work finishes sooner when you are not using the Mac.</div>
+
+<h2>How to tell which one it is</h2>
+<p>Open Activity Monitor (press <kbd>Command</kbd>-<kbd>Space</kbd> and type “Activity Monitor”), click <b>CPU</b>, and look for these names near the top:</p>
+<table>
+<thead><tr><th>Process</th><th>What it does</th></tr></thead>
+<tbody>
+<tr><td><code>photoanalysisd</code>, <code>mediaanalysisd</code></td><td>Photos looks for faces, objects and text in your pictures.</td></tr>
+<tr><td><code>bird</code>, <code>cloudd</code>, <code>fileproviderd</code></td><td>iCloud Drive uploads and downloads your files.</td></tr>
+<tr><td><code>mds_stores</code>, <code>mdworker_shared</code></td><td>Spotlight reads new and changed files so that you can search them.</td></tr>
+</tbody>
+</table>
+
+<h2>Why it happens</h2>
+<ul>
+<li><b>After a macOS update,</b> Spotlight often indexes the disk again, and Photos can analyze the library again.</li>
+<li><b>On a new Mac,</b> iCloud downloads your files, and Photos downloads and analyzes your library.</li>
+<li><b>After you add a lot,</b> such as a big photo import or many files in iCloud Drive.</li>
+</ul>
+
+<h2>How to help it finish</h2>
+<ol class="steps">
+<li><b>Let it run.</b> Leave the Mac on and plugged in when you do not use it, for example overnight. Most of this work takes a few hours to a day.</li>
+<li><b>Choose what iCloud syncs.</b> Choose <span class="path">Apple menu › System Settings</span>, click your name, then click <b>iCloud</b>. Turn off what you do not need on this Mac.</li>
+<li><b>Skip folders in Spotlight.</b> If Spotlight indexes a large folder that you never search, add it to the privacy list in Spotlight settings.</li>
+<li><b>Do not force these processes to quit.</b> macOS starts them again, and the work takes longer.</li>
+</ol>
+
+<h2>When to worry</h2>
+<p>If one of these processes is still busy after two or three days, restart your Mac. If it is still busy after that, contact Apple Support.</p>
+
+<section class="cta">
+<img src="../../icon.png" alt="" width="88" height="88">
+<div>
+<h2>Sluggish tells you when it is normal</h2>
+<p>When Photos, iCloud or Spotlight is the cause, Sluggish says so in plain words and tells you that it stops by itself. You do not have to guess what <code>mdworker_shared</code> means.</p>
+<a class="button" href="../../download/Sluggish.zip">Download Sluggish</a>
+<p class="fine">Your first 10 checks are free, then $12 one time. macOS 14 or later, Apple silicon and Intel.</p>
+</div>
+</section>
+
+<section class="related"><h2>Other causes of a slow Mac</h2><ul>
+<li><a href="../mac-too-hot/">Your Mac is too hot</a></li>
+<li><a href="../chrome-using-too-much-memory/">Your browser uses too much memory</a></li>
+<li><a href="../mac-storage-full/">Your disk is almost full</a></li>
+<li><a href="../mac-slow-startup-login-items/">Too many apps start by themselves</a></li>
+</ul></section>
+
+<p class="byline">By <a href="../../about/">Bryan Woods</a>, who makes Sluggish. Updated November 5, 2026.</p>
+</main>
+<footer><span>Made by Bryan Woods. The app collects no data. Contact: <a href="mailto:bryanwoods4e@gmail.com">bryanwoods4e@gmail.com</a></span><nav><a href="../">Help</a><a href="../../privacy/">Privacy</a><a href="../../terms/">Terms</a><a href="../../refund/">Refunds</a><a href="../../about/">About</a></nav></footer>
+</body>
+</html>
