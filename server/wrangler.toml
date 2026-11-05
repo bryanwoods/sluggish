@@ -1,6 +1,7 @@
 name = "sluggish-license"
 main = "worker.js"
 compatibility_date = "2026-10-01"
+routes = [{ pattern = "license.sluggishapp.com", custom_domain = true }]
 
 [vars]
 PADDLE_API = "https://api.paddle.com"
