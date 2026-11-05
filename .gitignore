@@ -4,3 +4,4 @@ build/
 /shots/
 *.key
 site/download/
+.wrangler/

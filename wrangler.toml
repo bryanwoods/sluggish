@@ -1,0 +1,9 @@
+name = "sluggish-site"
+compatibility_date = "2026-10-01"
+routes = [
+  { pattern = "sluggishapp.com", custom_domain = true },
+  { pattern = "www.sluggishapp.com", custom_domain = true },
+]
+
+[assets]
+directory = "site"
