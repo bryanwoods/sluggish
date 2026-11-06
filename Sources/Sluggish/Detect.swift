@@ -879,7 +879,7 @@ func selfTest() {
     precondition(!validLicense(key(#"{"t":"txn_02","d":"2026-10-30"}"#, signed: #"{"t":"txn_01","d":"2026-10-30"}"#), signer.publicKey))
     let trial = UserDefaults(suiteName: "app.sluggish.selftest")!
     trial.removePersistentDomain(forName: "app.sluggish.selftest")
-    precondition([0, 1800, 3599, 3600, 7300, 7000, 3000].map { countCheck(trial, now: now + Double($0)) } == [1, 1, 1, 2, 3, 3, 4])
+    precondition((1...3).map { _ in countCheck(trial) } == [1, 2, 3])
     trial.removePersistentDomain(forName: "app.sluggish.selftest")
     print("selftest ok")
 }

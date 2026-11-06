@@ -16,11 +16,7 @@ private func base64url(_ s: Substring) -> Data? {
     return Data(base64Encoded: b + String(repeating: "=", count: (4 - b.count % 4) % 4))
 }
 
-func countCheck(_ d: UserDefaults = .standard, now: Date = Date()) -> Int {
-    // abs: a clock that was once set ahead must not stop the count.
-    if abs(now.timeIntervalSince(d.object(forKey: "lastCheck") as? Date ?? .distantPast)) >= 3600 {
-        d.set(d.integer(forKey: "checks") + 1, forKey: "checks")
-        d.set(now, forKey: "lastCheck")
-    }
+func countCheck(_ d: UserDefaults = .standard) -> Int {
+    d.set(d.integer(forKey: "checks") + 1, forKey: "checks")
     return d.integer(forKey: "checks")
 }

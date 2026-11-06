@@ -101,6 +101,14 @@ final class AppKitPanel: NSObject {
             spinner.startAnimation(nil)
             root.addArrangedSubview(row(spacing: 8, [spinner, label("Checking your Mac…", .preferredFont(forTextStyle: .headline))]))
         }
+        if !model.licensed, model.used <= 10 {
+            let trial = row(spacing: 7, [
+                symbol("ticket", .callout, .systemOrange),
+                label("Free trial: \(10 - model.used) of 10 checks left", .boldSystemFont(ofSize: NSFont.preferredFont(forTextStyle: .callout).pointSize)), spacer(),
+                button("Buy Sluggish", prominent: false, tip: "", enabled: true) { NSWorkspace.shared.open(URL(string: "https://sluggishapp.com/buy")!) },
+            ])
+            root.addArrangedSubview(boxed(trial, padding: 8, radius: 8, fill: faded(.systemOrange, 0.12), width: 372))
+        }
         if let n = model.note {
             let banner = row(spacing: 7, [symbol(n.icon, .callout, n.color), label(n.text, .boldSystemFont(ofSize: NSFont.preferredFont(forTextStyle: .callout).pointSize), wraps: 356)])
             root.addArrangedSubview(boxed(banner, padding: 8, radius: 8, fill: faded(n.color, 0.12)))
@@ -155,9 +163,6 @@ final class AppKitPanel: NSObject {
             iconButton("arrow.clockwise", tip: "Check again", enabled: !model.busy) { [weak self] in self?.model.refresh(fresh: true) },
             iconButton("ellipsis.circle", tip: nil) { [weak self] in self?.showMenu() },
         ]))
-        if !model.licensed, model.used <= 10 {
-            root.addArrangedSubview(label("Free trial: \(10 - model.used) of 10 checks left", .preferredFont(forTextStyle: .caption1), .secondaryLabelColor))
-        }
         return root
     }
 
