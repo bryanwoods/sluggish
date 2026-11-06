@@ -13,9 +13,13 @@ export default {
     const payload = new TextEncoder().encode(JSON.stringify({ t: t.id, d: t.created_at.slice(0, 10) }));
     const key = await crypto.subtle.importKey("pkcs8", Uint8Array.from(atob(env.LICENSE_PRIVATE_KEY), (c) => c.charCodeAt(0)), { name: "Ed25519" }, false, ["sign"]);
     const signature = await crypto.subtle.sign({ name: "Ed25519" }, key, payload);
+    const license = `SLUG1-${b64url(payload)}.${b64url(signature)}`;
+    const file = `Your Sluggish license key:\n\n${license}\n\nClick ⋯ in Sluggish, choose Enter license key…, and paste the key.\nThe key works on all of your Macs.\n\nIf you lose this file, open this link to see the same key again:\n${request.url}\n`;
     return page(
-      `<h1>Your Sluggish license key</h1><p><code style="word-break:break-all;user-select:all">SLUG1-${b64url(payload)}.${b64url(signature)}</code></p>` +
-        "<p>Copy this key, then click ⋯ in Sluggish, choose Enter license key…, and paste it.</p><p>Keep the key. It works on all your Macs.</p>",
+      `<h1>Your Sluggish license key</h1><p><code style="word-break:break-all;user-select:all">${license}</code></p>` +
+        "<p>Copy this key, then click ⋯ in Sluggish, choose Enter license key…, and paste it.</p>" +
+        `<p>This page also downloads the key as a text file. Keep the file. The key works on all your Macs. <a id="file" download="Sluggish license key.txt" href="data:text/plain;charset=utf-8,${encodeURIComponent(file)}">Download the file again</a></p>` +
+        '<script>document.getElementById("file").click()</script>',
     );
   },
 };
