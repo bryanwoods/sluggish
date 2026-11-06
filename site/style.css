@@ -49,6 +49,7 @@ footer { margin-top: 64px; padding-top: 18px; border-top: 1px solid var(--line);
 .hero h1 { font-size: clamp(38px, 6.5vw, 64px); line-height: 1.04; margin: 0 auto 18px; max-width: 820px; }
 .lede { font-size: 20px; color: var(--muted); max-width: 620px; margin: 0 auto; }
 .hero .buttons { justify-content: center; }
+.hero .fine { max-width: 620px; margin-left: auto; margin-right: auto; }
 .fine { font-size: 14px; color: var(--muted); }
 .stage { margin: 44px auto 0; max-width: 880px; border-radius: 28px; overflow: hidden; padding-bottom: 48px; background: radial-gradient(ellipse 70% 60% at 20% 0%, rgba(255, 158, 10, .28), transparent), radial-gradient(ellipse 60% 70% at 100% 100%, rgba(255, 56, 94, .22), transparent), var(--tint); }
 .menubar { display: flex; justify-content: flex-end; align-items: center; gap: 18px; height: 32px; padding: 0 18px; background: var(--bar); backdrop-filter: blur(12px); border-bottom: 1px solid var(--line); font-size: 13px; font-weight: 500; }
@@ -173,7 +174,7 @@ details p { color: var(--muted); margin: 10px 0 0; }
 .help .lede { max-width: none; margin: 0 0 24px; text-wrap: pretty; }
 .help h2 { font-size: 25px; margin: 48px 0 12px; }
 .help p, .help li { line-height: 1.65; }
-.help ul:not(.causes):not(.nots) { padding-left: 22px; }
+.help ul:not(.causes):not(.nots):not(.checks) { padding-left: 22px; }
 .answer { padding: 18px 22px; border-radius: 16px; background: var(--tint); box-shadow: inset 4px 0 0 #ff7a1f; }
 .answer b { display: block; margin-bottom: 4px; font-size: 13px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--link); }
 .path { font-weight: 600; }
@@ -195,11 +196,14 @@ ol.steps > li::before { content: counter(step); position: absolute; left: 0; top
 .nots { list-style: none; padding: 0; }
 .nots li { position: relative; padding-left: 34px; margin-bottom: 12px; }
 .nots li::before { content: ""; position: absolute; left: 0; top: 3px; width: 22px; height: 22px; background-size: contain; }
-.cta { display: grid; grid-template-columns: 88px 1fr; gap: 24px; align-items: start; margin: 56px 0 0; padding: 32px; border-radius: 24px; background: radial-gradient(ellipse 70% 80% at 0% 0%, rgba(255, 158, 10, .22), transparent), radial-gradient(ellipse 60% 80% at 100% 100%, rgba(255, 56, 94, .18), transparent), var(--tint); }
+.cta { display: grid; grid-template-columns: auto 1fr; gap: 24px; align-items: start; margin: 56px 0 0; padding: 32px; border-radius: 24px; background: radial-gradient(ellipse 70% 80% at 0% 0%, rgba(255, 158, 10, .22), transparent), radial-gradient(ellipse 60% 80% at 100% 100%, rgba(255, 56, 94, .18), transparent), var(--tint); }
 .cta img { width: 88px; height: 88px; filter: drop-shadow(0 10px 20px rgba(255, 70, 60, .3)); }
 .help .cta h2 { margin: 0 0 8px; font-size: 24px; }
 .cta p { margin: 0 0 18px; }
 .cta .fine { margin: 12px 0 0; }
+.cta.app { margin-top: 32px; }
+.cta.app img { width: 240px; height: auto; filter: none; border-radius: 14px; box-shadow: var(--shadow); }
+.cta .checks { margin: 0 0 20px; }
 .related h2 { font-size: 20px; }
 .related ul { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 10px; list-style: none; padding: 0 !important; }
 .related li { margin: 0; }
@@ -211,6 +215,7 @@ ol.steps > li::before { content: counter(step); position: absolute; left: 0; top
 @media (max-width: 560px) {
   .cta { grid-template-columns: 1fr; padding: 24px; }
   .cta img { width: 64px; height: 64px; }
+  .cta.app img { width: 100%; max-width: 320px; height: auto; }
   .causes a { grid-template-columns: 36px 1fr; gap: 2px 12px; padding: 16px; }
   .causes svg { width: 36px; height: 36px; padding: 8px; border-radius: 10px; }
 }
