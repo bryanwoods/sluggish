@@ -7,6 +7,7 @@
 <meta name="description" content="Sluggish costs $12, one time, for all of your own Macs.">
 <link rel="icon" href="../icon.png">
 <link rel="stylesheet" href="../style.css">
+<script src="../ads.js"></script>
 </head>
 <body>
 <main>
@@ -26,7 +27,10 @@
       Paddle.Initialize({
         token,
         eventCallback(event) {
-          if (event.name === "checkout.completed") location.href = "https://license.sluggishapp.com/license?txn=" + event.data.transaction_id;
+          if (event.name !== "checkout.completed") return;
+          const txn = event.data.transaction_id, go = () => location.href = "https://license.sluggishapp.com/license?txn=" + txn;
+          gtag("event", "conversion", { send_to: "AW-1060073178/IT_OCNCuvbMdENrdvfkD", value: 12, currency: "USD", transaction_id: txn, event_callback: go });
+          setTimeout(go, 1000);
         },
       });
       const buy = document.getElementById("buy");
