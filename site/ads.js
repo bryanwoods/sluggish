@@ -8,3 +8,4 @@ gtag("consent", "default", {
 gtag("js", new Date());
 gtag("config", "AW-1060073178");
 document.head.append(Object.assign(document.createElement("script"), { async: true, src: "https://www.googletagmanager.com/gtag/js?id=AW-1060073178" }));
+addEventListener("click", (e) => e.target.closest('a[href$="Sluggish.zip"]') && gtag("event", "conversion", { send_to: "AW-1060073178/QGJ2CNijxLMdENrdvfkD" }));
